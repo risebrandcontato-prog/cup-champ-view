@@ -10,6 +10,10 @@ interface AuthState {
   loading: boolean;
 }
 
+// Untyped supabase to bypass not-yet-generated table types
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const db = supabase as any;
+
 export function useAuth(): AuthState {
   const [state, setState] = useState<AuthState>({ session: null, user: null, profile: null, loading: true });
 
@@ -17,8 +21,8 @@ export function useAuth(): AuthState {
     let mounted = true;
 
     const fetchProfile = async (userId: string) => {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-      if (mounted) setState((s) => ({ ...s, profile: (data as Profile) ?? null, loading: false }));
+      const { data } = await db.from('profiles').select('*').eq('id', userId).maybeSingle();
+      if (mounted) setState((s) => ({ ...s, profile: (data as Profile | null) ?? null, loading: false }));
     };
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
