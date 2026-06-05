@@ -14,6 +14,7 @@ import { Route as NewsRouteImport } from './routes/news'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as CompleteProfileRouteImport } from './routes/complete-profile'
+import { Route as BonusesRouteImport } from './routes/bonuses'
 import { Route as BankrollRouteImport } from './routes/bankroll'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as NewsIdRouteImport } from './routes/news.$id'
@@ -44,6 +45,11 @@ const CompleteProfileRoute = CompleteProfileRouteImport.update({
   path: '/complete-profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BonusesRoute = BonusesRouteImport.update({
+  id: '/bonuses',
+  path: '/bonuses',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BankrollRoute = BankrollRouteImport.update({
   id: '/bankroll',
   path: '/bankroll',
@@ -68,6 +74,7 @@ const AnalysisIdRoute = AnalysisIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bankroll': typeof BankrollRoute
+  '/bonuses': typeof BonusesRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bankroll': typeof BankrollRoute
+  '/bonuses': typeof BonusesRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bankroll': typeof BankrollRoute
+  '/bonuses': typeof BonusesRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/bankroll'
+    | '/bonuses'
     | '/complete-profile'
     | '/history'
     | '/login'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/bankroll'
+    | '/bonuses'
     | '/complete-profile'
     | '/history'
     | '/login'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/bankroll'
+    | '/bonuses'
     | '/complete-profile'
     | '/history'
     | '/login'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BankrollRoute: typeof BankrollRoute
+  BonusesRoute: typeof BonusesRoute
   CompleteProfileRoute: typeof CompleteProfileRoute
   HistoryRoute: typeof HistoryRoute
   LoginRoute: typeof LoginRoute
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/complete-profile'
       fullPath: '/complete-profile'
       preLoaderRoute: typeof CompleteProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bonuses': {
+      id: '/bonuses'
+      path: '/bonuses'
+      fullPath: '/bonuses'
+      preLoaderRoute: typeof BonusesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bankroll': {
@@ -227,6 +247,7 @@ const NewsRouteWithChildren = NewsRoute._addFileChildren(NewsRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BankrollRoute: BankrollRoute,
+  BonusesRoute: BonusesRoute,
   CompleteProfileRoute: CompleteProfileRoute,
   HistoryRoute: HistoryRoute,
   LoginRoute: LoginRoute,
