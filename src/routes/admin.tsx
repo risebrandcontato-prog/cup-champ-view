@@ -7,14 +7,15 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 export const Route = createFileRoute('/admin')({ component: AdminLayout });
 
-const items = [
+interface NavItem { to: string; icon: typeof LayoutDashboard; label: string; exact?: boolean }
+const items: NavItem[] = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/admin/users', icon: Users, label: 'Usuários' },
   { to: '/admin/analyses', icon: TrendingUp, label: 'Análises' },
   { to: '/admin/news', icon: Newspaper, label: 'Notícias' },
   { to: '/admin/bonuses', icon: Gift, label: 'Bônus' },
   { to: '/admin/settings', icon: Settings, label: 'Suporte' },
-] as const;
+];
 
 function AdminLayout() {
   const navigate = useNavigate();
