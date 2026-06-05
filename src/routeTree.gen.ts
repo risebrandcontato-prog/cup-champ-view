@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CompleteProfileRouteImport } from './routes/complete-profile'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalysisIdRouteImport } from './routes/analysis.$id'
 
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/analysis/$id': typeof AnalysisIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/analysis/$id': typeof AnalysisIdRoute
 }
 export interface FileRoutesById {
@@ -52,25 +60,40 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/complete-profile': typeof CompleteProfileRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/analysis/$id': typeof AnalysisIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/complete-profile' | '/login' | '/analysis/$id'
+  fullPaths: '/' | '/complete-profile' | '/login' | '/profile' | '/analysis/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/complete-profile' | '/login' | '/analysis/$id'
-  id: '__root__' | '/' | '/complete-profile' | '/login' | '/analysis/$id'
+  to: '/' | '/complete-profile' | '/login' | '/profile' | '/analysis/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/complete-profile'
+    | '/login'
+    | '/profile'
+    | '/analysis/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CompleteProfileRoute: typeof CompleteProfileRoute
   LoginRoute: typeof LoginRoute
+  ProfileRoute: typeof ProfileRoute
   AnalysisIdRoute: typeof AnalysisIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -106,6 +129,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CompleteProfileRoute: CompleteProfileRoute,
   LoginRoute: LoginRoute,
+  ProfileRoute: ProfileRoute,
   AnalysisIdRoute: AnalysisIdRoute,
 }
 export const routeTree = rootRouteImport
