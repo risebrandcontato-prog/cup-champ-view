@@ -9,38 +9,341 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SupportRouteImport } from './routes/support'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as NewsRouteImport } from './routes/news'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as HistoryRouteImport } from './routes/history'
+import { Route as CompleteProfileRouteImport } from './routes/complete-profile'
+import { Route as BonusesRouteImport } from './routes/bonuses'
+import { Route as BankrollRouteImport } from './routes/bankroll'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as NewsIdRouteImport } from './routes/news.$id'
+import { Route as AnalysisIdRouteImport } from './routes/analysis.$id'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminNewsRouteImport } from './routes/admin.news'
+import { Route as AdminBonusesRouteImport } from './routes/admin.bonuses'
+import { Route as AdminAnalysesRouteImport } from './routes/admin.analyses'
+import { Route as AdminAnalysesNewRouteImport } from './routes/admin.analyses.new'
+import { Route as AdminAnalysesIdEditRouteImport } from './routes/admin.analyses.$id.edit'
 
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewsRoute = NewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompleteProfileRoute = CompleteProfileRouteImport.update({
+  id: '/complete-profile',
+  path: '/complete-profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BonusesRoute = BonusesRouteImport.update({
+  id: '/bonuses',
+  path: '/bonuses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BankrollRoute = BankrollRouteImport.update({
+  id: '/bankroll',
+  path: '/bankroll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const NewsIdRoute = NewsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => NewsRoute,
+} as any)
+const AnalysisIdRoute = AnalysisIdRouteImport.update({
+  id: '/analysis/$id',
+  path: '/analysis/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNewsRoute = AdminNewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBonusesRoute = AdminBonusesRouteImport.update({
+  id: '/bonuses',
+  path: '/bonuses',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAnalysesRoute = AdminAnalysesRouteImport.update({
+  id: '/analyses',
+  path: '/analyses',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAnalysesNewRoute = AdminAnalysesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AdminAnalysesRoute,
+} as any)
+const AdminAnalysesIdEditRoute = AdminAnalysesIdEditRouteImport.update({
+  id: '/$id/edit',
+  path: '/$id/edit',
+  getParentRoute: () => AdminAnalysesRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/bankroll': typeof BankrollRoute
+  '/bonuses': typeof BonusesRoute
+  '/complete-profile': typeof CompleteProfileRoute
+  '/history': typeof HistoryRoute
+  '/login': typeof LoginRoute
+  '/news': typeof NewsRouteWithChildren
+  '/profile': typeof ProfileRoute
+  '/support': typeof SupportRoute
+  '/admin/analyses': typeof AdminAnalysesRouteWithChildren
+  '/admin/bonuses': typeof AdminBonusesRoute
+  '/admin/news': typeof AdminNewsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/analysis/$id': typeof AnalysisIdRoute
+  '/news/$id': typeof NewsIdRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/analyses/new': typeof AdminAnalysesNewRoute
+  '/admin/analyses/$id/edit': typeof AdminAnalysesIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/bankroll': typeof BankrollRoute
+  '/bonuses': typeof BonusesRoute
+  '/complete-profile': typeof CompleteProfileRoute
+  '/history': typeof HistoryRoute
+  '/login': typeof LoginRoute
+  '/news': typeof NewsRouteWithChildren
+  '/profile': typeof ProfileRoute
+  '/support': typeof SupportRoute
+  '/admin/analyses': typeof AdminAnalysesRouteWithChildren
+  '/admin/bonuses': typeof AdminBonusesRoute
+  '/admin/news': typeof AdminNewsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/analysis/$id': typeof AnalysisIdRoute
+  '/news/$id': typeof NewsIdRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/analyses/new': typeof AdminAnalysesNewRoute
+  '/admin/analyses/$id/edit': typeof AdminAnalysesIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/bankroll': typeof BankrollRoute
+  '/bonuses': typeof BonusesRoute
+  '/complete-profile': typeof CompleteProfileRoute
+  '/history': typeof HistoryRoute
+  '/login': typeof LoginRoute
+  '/news': typeof NewsRouteWithChildren
+  '/profile': typeof ProfileRoute
+  '/support': typeof SupportRoute
+  '/admin/analyses': typeof AdminAnalysesRouteWithChildren
+  '/admin/bonuses': typeof AdminBonusesRoute
+  '/admin/news': typeof AdminNewsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/analysis/$id': typeof AnalysisIdRoute
+  '/news/$id': typeof NewsIdRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/analyses/new': typeof AdminAnalysesNewRoute
+  '/admin/analyses/$id/edit': typeof AdminAnalysesIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/bankroll'
+    | '/bonuses'
+    | '/complete-profile'
+    | '/history'
+    | '/login'
+    | '/news'
+    | '/profile'
+    | '/support'
+    | '/admin/analyses'
+    | '/admin/bonuses'
+    | '/admin/news'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/analysis/$id'
+    | '/news/$id'
+    | '/admin/'
+    | '/admin/analyses/new'
+    | '/admin/analyses/$id/edit'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/bankroll'
+    | '/bonuses'
+    | '/complete-profile'
+    | '/history'
+    | '/login'
+    | '/news'
+    | '/profile'
+    | '/support'
+    | '/admin/analyses'
+    | '/admin/bonuses'
+    | '/admin/news'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/analysis/$id'
+    | '/news/$id'
+    | '/admin'
+    | '/admin/analyses/new'
+    | '/admin/analyses/$id/edit'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/bankroll'
+    | '/bonuses'
+    | '/complete-profile'
+    | '/history'
+    | '/login'
+    | '/news'
+    | '/profile'
+    | '/support'
+    | '/admin/analyses'
+    | '/admin/bonuses'
+    | '/admin/news'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/analysis/$id'
+    | '/news/$id'
+    | '/admin/'
+    | '/admin/analyses/new'
+    | '/admin/analyses/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  BankrollRoute: typeof BankrollRoute
+  BonusesRoute: typeof BonusesRoute
+  CompleteProfileRoute: typeof CompleteProfileRoute
+  HistoryRoute: typeof HistoryRoute
+  LoginRoute: typeof LoginRoute
+  NewsRoute: typeof NewsRouteWithChildren
+  ProfileRoute: typeof ProfileRoute
+  SupportRoute: typeof SupportRoute
+  AnalysisIdRoute: typeof AnalysisIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/news': {
+      id: '/news'
+      path: '/news'
+      fullPath: '/news'
+      preLoaderRoute: typeof NewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/complete-profile': {
+      id: '/complete-profile'
+      path: '/complete-profile'
+      fullPath: '/complete-profile'
+      preLoaderRoute: typeof CompleteProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bonuses': {
+      id: '/bonuses'
+      path: '/bonuses'
+      fullPath: '/bonuses'
+      preLoaderRoute: typeof BonusesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bankroll': {
+      id: '/bankroll'
+      path: '/bankroll'
+      fullPath: '/bankroll'
+      preLoaderRoute: typeof BankrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +351,136 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/news/$id': {
+      id: '/news/$id'
+      path: '/$id'
+      fullPath: '/news/$id'
+      preLoaderRoute: typeof NewsIdRouteImport
+      parentRoute: typeof NewsRoute
+    }
+    '/analysis/$id': {
+      id: '/analysis/$id'
+      path: '/analysis/$id'
+      fullPath: '/analysis/$id'
+      preLoaderRoute: typeof AnalysisIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/news': {
+      id: '/admin/news'
+      path: '/news'
+      fullPath: '/admin/news'
+      preLoaderRoute: typeof AdminNewsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/bonuses': {
+      id: '/admin/bonuses'
+      path: '/bonuses'
+      fullPath: '/admin/bonuses'
+      preLoaderRoute: typeof AdminBonusesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/analyses': {
+      id: '/admin/analyses'
+      path: '/analyses'
+      fullPath: '/admin/analyses'
+      preLoaderRoute: typeof AdminAnalysesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/analyses/new': {
+      id: '/admin/analyses/new'
+      path: '/new'
+      fullPath: '/admin/analyses/new'
+      preLoaderRoute: typeof AdminAnalysesNewRouteImport
+      parentRoute: typeof AdminAnalysesRoute
+    }
+    '/admin/analyses/$id/edit': {
+      id: '/admin/analyses/$id/edit'
+      path: '/$id/edit'
+      fullPath: '/admin/analyses/$id/edit'
+      preLoaderRoute: typeof AdminAnalysesIdEditRouteImport
+      parentRoute: typeof AdminAnalysesRoute
+    }
   }
 }
 
+interface AdminAnalysesRouteChildren {
+  AdminAnalysesNewRoute: typeof AdminAnalysesNewRoute
+  AdminAnalysesIdEditRoute: typeof AdminAnalysesIdEditRoute
+}
+
+const AdminAnalysesRouteChildren: AdminAnalysesRouteChildren = {
+  AdminAnalysesNewRoute: AdminAnalysesNewRoute,
+  AdminAnalysesIdEditRoute: AdminAnalysesIdEditRoute,
+}
+
+const AdminAnalysesRouteWithChildren = AdminAnalysesRoute._addFileChildren(
+  AdminAnalysesRouteChildren,
+)
+
+interface AdminRouteChildren {
+  AdminAnalysesRoute: typeof AdminAnalysesRouteWithChildren
+  AdminBonusesRoute: typeof AdminBonusesRoute
+  AdminNewsRoute: typeof AdminNewsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAnalysesRoute: AdminAnalysesRouteWithChildren,
+  AdminBonusesRoute: AdminBonusesRoute,
+  AdminNewsRoute: AdminNewsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface NewsRouteChildren {
+  NewsIdRoute: typeof NewsIdRoute
+}
+
+const NewsRouteChildren: NewsRouteChildren = {
+  NewsIdRoute: NewsIdRoute,
+}
+
+const NewsRouteWithChildren = NewsRoute._addFileChildren(NewsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  BankrollRoute: BankrollRoute,
+  BonusesRoute: BonusesRoute,
+  CompleteProfileRoute: CompleteProfileRoute,
+  HistoryRoute: HistoryRoute,
+  LoginRoute: LoginRoute,
+  NewsRoute: NewsRouteWithChildren,
+  ProfileRoute: ProfileRoute,
+  SupportRoute: SupportRoute,
+  AnalysisIdRoute: AnalysisIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
