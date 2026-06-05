@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as NewsRouteImport } from './routes/news'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as CompleteProfileRouteImport } from './routes/complete-profile'
@@ -20,6 +21,11 @@ import { Route as AnalysisIdRouteImport } from './routes/analysis.$id'
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewsRoute = NewsRouteImport.update({
+  id: '/news',
+  path: '/news',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/complete-profile': typeof CompleteProfileRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
+  '/news': typeof NewsRoute
   '/profile': typeof ProfileRoute
   '/analysis/$id': typeof AnalysisIdRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/complete-profile': typeof CompleteProfileRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
+  '/news': typeof NewsRoute
   '/profile': typeof ProfileRoute
   '/analysis/$id': typeof AnalysisIdRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/complete-profile': typeof CompleteProfileRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
+  '/news': typeof NewsRoute
   '/profile': typeof ProfileRoute
   '/analysis/$id': typeof AnalysisIdRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/complete-profile'
     | '/history'
     | '/login'
+    | '/news'
     | '/profile'
     | '/analysis/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/complete-profile'
     | '/history'
     | '/login'
+    | '/news'
     | '/profile'
     | '/analysis/$id'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/complete-profile'
     | '/history'
     | '/login'
+    | '/news'
     | '/profile'
     | '/analysis/$id'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   CompleteProfileRoute: typeof CompleteProfileRoute
   HistoryRoute: typeof HistoryRoute
   LoginRoute: typeof LoginRoute
+  NewsRoute: typeof NewsRoute
   ProfileRoute: typeof ProfileRoute
   AnalysisIdRoute: typeof AnalysisIdRoute
 }
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/news': {
+      id: '/news'
+      path: '/news'
+      fullPath: '/news'
+      preLoaderRoute: typeof NewsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   CompleteProfileRoute: CompleteProfileRoute,
   HistoryRoute: HistoryRoute,
   LoginRoute: LoginRoute,
+  NewsRoute: NewsRoute,
   ProfileRoute: ProfileRoute,
   AnalysisIdRoute: AnalysisIdRoute,
 }
