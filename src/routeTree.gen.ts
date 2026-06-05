@@ -23,6 +23,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as NewsIdRouteImport } from './routes/news.$id'
 import { Route as AnalysisIdRouteImport } from './routes/analysis.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminNewsRouteImport } from './routes/admin.news'
 import { Route as AdminBonusesRouteImport } from './routes/admin.bonuses'
 import { Route as AdminAnalysesRouteImport } from './routes/admin.analyses'
@@ -99,6 +100,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminNewsRoute = AdminNewsRouteImport.update({
   id: '/news',
   path: '/news',
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/admin/analyses': typeof AdminAnalysesRouteWithChildren
   '/admin/bonuses': typeof AdminBonusesRoute
   '/admin/news': typeof AdminNewsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/analysis/$id': typeof AnalysisIdRoute
   '/news/$id': typeof NewsIdRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/admin/analyses': typeof AdminAnalysesRouteWithChildren
   '/admin/bonuses': typeof AdminBonusesRoute
   '/admin/news': typeof AdminNewsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/analysis/$id': typeof AnalysisIdRoute
   '/news/$id': typeof NewsIdRoute
@@ -181,6 +189,7 @@ export interface FileRoutesById {
   '/admin/analyses': typeof AdminAnalysesRouteWithChildren
   '/admin/bonuses': typeof AdminBonusesRoute
   '/admin/news': typeof AdminNewsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/analysis/$id': typeof AnalysisIdRoute
   '/news/$id': typeof NewsIdRoute
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
     | '/admin/analyses'
     | '/admin/bonuses'
     | '/admin/news'
+    | '/admin/settings'
     | '/admin/users'
     | '/analysis/$id'
     | '/news/$id'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/admin/analyses'
     | '/admin/bonuses'
     | '/admin/news'
+    | '/admin/settings'
     | '/admin/users'
     | '/analysis/$id'
     | '/news/$id'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/admin/analyses'
     | '/admin/bonuses'
     | '/admin/news'
+    | '/admin/settings'
     | '/admin/users'
     | '/analysis/$id'
     | '/news/$id'
@@ -367,6 +379,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/news': {
       id: '/admin/news'
       path: '/news'
@@ -423,6 +442,7 @@ interface AdminRouteChildren {
   AdminAnalysesRoute: typeof AdminAnalysesRouteWithChildren
   AdminBonusesRoute: typeof AdminBonusesRoute
   AdminNewsRoute: typeof AdminNewsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -431,6 +451,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAnalysesRoute: AdminAnalysesRouteWithChildren,
   AdminBonusesRoute: AdminBonusesRoute,
   AdminNewsRoute: AdminNewsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
