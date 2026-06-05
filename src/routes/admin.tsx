@@ -67,7 +67,7 @@ function SidebarContent() {
           const active = it.exact ? pathname === it.to : pathname.startsWith(it.to);
           const Icon = it.icon;
           return (
-            <Link key={it.to} to={it.to} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${active ? 'bg-arena-green/15 text-arena-green border-l-2 border-arena-green' : 'text-arena-text-secondary hover:text-white hover:bg-arena-gray/40'}`}>
+            <Link key={it.to} to={it.to as '/admin'} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${active ? 'bg-arena-green/15 text-arena-green border-l-2 border-arena-green' : 'text-arena-text-secondary hover:text-white hover:bg-arena-gray/40'}`}>
               <Icon className="w-4 h-4" /> {it.label}
             </Link>
           );
