@@ -25,6 +25,7 @@ import { Route as AnalysisIdRouteImport } from './routes/analysis.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminAnalysesRouteImport } from './routes/admin.analyses'
 import { Route as AdminAnalysesNewRouteImport } from './routes/admin.analyses.new'
+import { Route as AdminAnalysesIdEditRouteImport } from './routes/admin.analyses.$id.edit'
 
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
@@ -106,6 +107,11 @@ const AdminAnalysesNewRoute = AdminAnalysesNewRouteImport.update({
   path: '/new',
   getParentRoute: () => AdminAnalysesRoute,
 } as any)
+const AdminAnalysesIdEditRoute = AdminAnalysesIdEditRouteImport.update({
+  id: '/$id/edit',
+  path: '/$id/edit',
+  getParentRoute: () => AdminAnalysesRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/news/$id': typeof NewsIdRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/analyses/new': typeof AdminAnalysesNewRoute
+  '/admin/analyses/$id/edit': typeof AdminAnalysesIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/news/$id': typeof NewsIdRoute
   '/admin': typeof AdminIndexRoute
   '/admin/analyses/new': typeof AdminAnalysesNewRoute
+  '/admin/analyses/$id/edit': typeof AdminAnalysesIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   '/news/$id': typeof NewsIdRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/analyses/new': typeof AdminAnalysesNewRoute
+  '/admin/analyses/$id/edit': typeof AdminAnalysesIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/news/$id'
     | '/admin/'
     | '/admin/analyses/new'
+    | '/admin/analyses/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/news/$id'
     | '/admin'
     | '/admin/analyses/new'
+    | '/admin/analyses/$id/edit'
   id:
     | '__root__'
     | '/'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/news/$id'
     | '/admin/'
     | '/admin/analyses/new'
+    | '/admin/analyses/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -345,15 +357,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAnalysesNewRouteImport
       parentRoute: typeof AdminAnalysesRoute
     }
+    '/admin/analyses/$id/edit': {
+      id: '/admin/analyses/$id/edit'
+      path: '/$id/edit'
+      fullPath: '/admin/analyses/$id/edit'
+      preLoaderRoute: typeof AdminAnalysesIdEditRouteImport
+      parentRoute: typeof AdminAnalysesRoute
+    }
   }
 }
 
 interface AdminAnalysesRouteChildren {
   AdminAnalysesNewRoute: typeof AdminAnalysesNewRoute
+  AdminAnalysesIdEditRoute: typeof AdminAnalysesIdEditRoute
 }
 
 const AdminAnalysesRouteChildren: AdminAnalysesRouteChildren = {
   AdminAnalysesNewRoute: AdminAnalysesNewRoute,
+  AdminAnalysesIdEditRoute: AdminAnalysesIdEditRoute,
 }
 
 const AdminAnalysesRouteWithChildren = AdminAnalysesRoute._addFileChildren(
