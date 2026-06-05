@@ -23,6 +23,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as NewsIdRouteImport } from './routes/news.$id'
 import { Route as AnalysisIdRouteImport } from './routes/analysis.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminNewsRouteImport } from './routes/admin.news'
 import { Route as AdminAnalysesRouteImport } from './routes/admin.analyses'
 import { Route as AdminAnalysesNewRouteImport } from './routes/admin.analyses.new'
 import { Route as AdminAnalysesIdEditRouteImport } from './routes/admin.analyses.$id.edit'
@@ -97,6 +98,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminNewsRoute = AdminNewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAnalysesRoute = AdminAnalysesRouteImport.update({
   id: '/analyses',
   path: '/analyses',
@@ -125,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/support': typeof SupportRoute
   '/admin/analyses': typeof AdminAnalysesRouteWithChildren
+  '/admin/news': typeof AdminNewsRoute
   '/admin/users': typeof AdminUsersRoute
   '/analysis/$id': typeof AnalysisIdRoute
   '/news/$id': typeof NewsIdRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/support': typeof SupportRoute
   '/admin/analyses': typeof AdminAnalysesRouteWithChildren
+  '/admin/news': typeof AdminNewsRoute
   '/admin/users': typeof AdminUsersRoute
   '/analysis/$id': typeof AnalysisIdRoute
   '/news/$id': typeof NewsIdRoute
@@ -163,6 +171,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/support': typeof SupportRoute
   '/admin/analyses': typeof AdminAnalysesRouteWithChildren
+  '/admin/news': typeof AdminNewsRoute
   '/admin/users': typeof AdminUsersRoute
   '/analysis/$id': typeof AnalysisIdRoute
   '/news/$id': typeof NewsIdRoute
@@ -184,6 +193,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/support'
     | '/admin/analyses'
+    | '/admin/news'
     | '/admin/users'
     | '/analysis/$id'
     | '/news/$id'
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/support'
     | '/admin/analyses'
+    | '/admin/news'
     | '/admin/users'
     | '/analysis/$id'
     | '/news/$id'
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/support'
     | '/admin/analyses'
+    | '/admin/news'
     | '/admin/users'
     | '/analysis/$id'
     | '/news/$id'
@@ -343,6 +355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/news': {
+      id: '/admin/news'
+      path: '/news'
+      fullPath: '/admin/news'
+      preLoaderRoute: typeof AdminNewsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/analyses': {
       id: '/admin/analyses'
       path: '/analyses'
@@ -383,12 +402,14 @@ const AdminAnalysesRouteWithChildren = AdminAnalysesRoute._addFileChildren(
 
 interface AdminRouteChildren {
   AdminAnalysesRoute: typeof AdminAnalysesRouteWithChildren
+  AdminNewsRoute: typeof AdminNewsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAnalysesRoute: AdminAnalysesRouteWithChildren,
+  AdminNewsRoute: AdminNewsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
