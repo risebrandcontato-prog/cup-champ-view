@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Outlet, createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, createRootRouteWithContext, HeadContent, Scripts, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
+import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
+import { PWAStatusBar } from "@/components/pwa/PWAStatusBar";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -11,9 +13,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" },
       { name: "theme-color", content: "#0A0A0A" },
+      { name: "theme-color", content: "#00C853", media: "(prefers-color-scheme: dark)" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "APOSTA RESTRITA" },
+      { name: "msapplication-TileColor", content: "#00C853" },
+      { name: "msapplication-TileImage", content: "/icons/icon-144x144.png" },
+      { name: "format-detection", content: "telephone=no" },
       { title: "APOSTA RESTRITA — Análises Esportivas Premium" },
       { name: "description", content: "Análises esportivas premium em tempo real. Copa do Mundo 2026 e muito mais." },
       { property: "og:title", content: "APOSTA RESTRITA — Análises Esportivas Premium" },
@@ -28,13 +34,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/manifest.json" },
-      { rel: "icon", href: "/icons/icon-192x192.png" },
-      { rel: "apple-touch-icon", href: "/icons/icon-192x192.png" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "/icons/icon-192x192.png" },
+      { rel: "icon", type: "image/png", sizes: "512x512", href: "/icons/icon-512x512.png" },
+      { rel: "apple-touch-icon", sizes: "152x152", href: "/icons/icon-152x152.png" },
+      { rel: "apple-touch-icon", sizes: "192x192", href: "/icons/icon-192x192.png" },
+      { rel: "apple-touch-startup-image", href: "/icons/splash-1170x2532.png", media: "(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" },
     ],
   }),
+  notFoundComponent: () => (
+    <div className="flex min-h-screen items-center justify-center bg-arena-black text-white">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-arena-gold mb-4">404</h1>
+        <p className="text-arena-text-secondary mb-6">Página não encontrada</p>
+        <Link to="/" className="bg-arena-green text-black px-6 py-3 rounded-xl font-bold">
+          Voltar para Home
+        </Link>
+      </div>
+    </div>
+  ),
   shellComponent: RootShell,
   component: RootComponent,
 });
@@ -53,8 +73,20 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    // Register Service Worker
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => console.log("[PWA] SW registered:", reg.scope))
+        .catch((err) => console.error("[PWA] SW error:", err));
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
+      <PWAStatusBar />
       <Outlet />
       <Toaster theme="dark" position="top-center" richColors closeButton />
     </QueryClientProvider>
