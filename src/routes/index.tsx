@@ -133,3 +133,4 @@ function AnalysisCard({ a, index }: { a: Analysis; index: number }) {
     </motion.div>
   );
 }
+ 
