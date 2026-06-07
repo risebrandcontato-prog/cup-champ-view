@@ -362,4 +362,4 @@ export function FixtureDataPanel({ data }: FixtureDataPanelProps) {
       </Tabs>
     </motion.div>
   );
-}
+} 

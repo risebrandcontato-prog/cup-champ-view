@@ -195,4 +195,4 @@ export function MatchCardSkeleton() {
       </div>
     </div>
   )
-}
+}  
