@@ -1,5 +1,4 @@
-
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Plus, X, Loader2, AlertTriangle } from 'lucide-react';
+import { Upload, Plus, X, Loader2, AlertTriangle, Search, Link2, RefreshCw, Shield, CalendarDays } from 'lucide-react';
 import { SPORTS, BET_TYPES } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useNavigate } from '@tanstack/react-router';
@@ -23,6 +22,12 @@ interface MatchInput {
   match_time: string; 
 }
 
+interface ApiFixture {
+  fixture: { id: number; date: string; timestamp: number };
+  league: { name: string; country: string };
+  teams: { home: { id: number; name: string }; away: { id: number; name: string } };
+}
+
 export interface AnalysisFormProps { 
   initial?: Analysis & { matches?: AnalysisMatch[] }; 
 }
@@ -30,7 +35,7 @@ export interface AnalysisFormProps {
 export function AnalysisForm({ initial }: AnalysisFormProps) {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
-  
+
   if (!Array.isArray(SPORTS)) {
     return (
       <div className="p-6 rounded-2xl border border-arena-red/30 bg-arena-red/10 text-arena-red">
@@ -62,6 +67,7 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
   const [bookmakerName, setBookmakerName] = useState(initial?.bookmaker_name ?? '');
   const [bookmakerLink, setBookmakerLink] = useState(initial?.bookmaker_link ?? '');
   const [odds, setOdds] = useState(initial?.odds?.toString() ?? '');
+  const [matchDate, setMatchDate] = useState(initial?.match_date ? initial.match_date.slice(0, 16) : '');
   const [matches, setMatches] = useState<MatchInput[]>(
     initial?.matches?.map((m) => ({ 
       home_team: m.home_team, 
@@ -75,36 +81,110 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // ─── API FIXTURE STATES ───
+  const [useApiFixture, setUseApiFixture] = useState(!!initial?.fixture_id);
+  const [fixtureId, setFixtureId] = useState<number | null>(initial?.fixture_id ?? null);
+  const [todayFixtures, setTodayFixtures] = useState<ApiFixture[]>([]);
+  const [loadingFixtures, setLoadingFixtures] = useState(false);
+  const [fixtureSearch, setFixtureSearch] = useState('');
+
+  // Buscar jogos do dia quando toggle API está ativo
+  useEffect(() => {
+    if (!useApiFixture) {
+      setTodayFixtures([]);
+      setFixtureId(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingFixtures(true);
+
+    (async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const { data, error } = await supabase.functions.invoke('api-football', {
+          body: {
+            endpoint: 'fixtures',
+            params: { date: today, timezone: 'America/Sao_Paulo' },
+          },
+        });
+        if (cancelled) return;
+        if (error) throw error;
+        const fixtures = (data?.response || []).filter((f: any) => f?.fixture?.id && f?.teams?.home?.name && f?.teams?.away?.name);
+        setTodayFixtures(fixtures);
+      } catch (err) {
+        console.error('[AnalysisForm] Erro ao buscar jogos:', err);
+        if (!cancelled) toast.error('Erro ao buscar jogos do dia');
+      } finally {
+        if (!cancelled) setLoadingFixtures(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [useApiFixture]);
+
+  const selectFixture = useCallback((fixture: ApiFixture) => {
+    const home = fixture.teams.home.name;
+    const away = fixture.teams.away.name;
+    const league = fixture.league.name;
+    const date = fixture.fixture.date;
+
+    setFixtureId(fixture.fixture.id);
+    setTitle(`${home} vs ${away}`);
+    setChampionship(league);
+    setMatchDate(date ? date.slice(0, 16) : '');
+    setSportType('futebol');
+    setTab('structured');
+
+    // Preenche automaticamente um match
+    setMatches([{
+      home_team: home,
+      away_team: away,
+      league: league,
+      bet_type: 'Resultado Final',
+      odds: '',
+      match_time: date ? date.slice(0, 16) : '',
+    }]);
+
+    toast.success(`Jogo selecionado: ${home} vs ${away}`);
+  }, []);
+
+  const clearFixture = useCallback(() => {
+    setFixtureId(null);
+    setTodayFixtures([]);
+    setFixtureSearch('');
+  }, []);
+
   const upload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     if (!file.type.startsWith('image/')) {
       toast.error('Apenas imagens são permitidas');
       return;
     }
-    
+
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Imagem deve ter no máximo 5MB');
       return;
     }
-    
+
     setUploading(true);
     const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png';
     const path = `${Date.now()}.${ext}`;
-    
+
     const { error } = await supabase.storage.from('analysis-images').upload(path, file, {
       cacheControl: '3600',
       upsert: false
     });
-    
+
     setUploading(false);
-    
+
     if (error) { 
       toast.error('Erro no upload: ' + error.message); 
       return; 
     }
-    
+
     const { data } = supabase.storage.from('analysis-images').getPublicUrl(path);
     setImageUrl(data.publicUrl);
     toast.success('Imagem enviada');
@@ -144,7 +224,7 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
     }
 
     setSaving(true);
-    
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error('Usuário não autenticado');
@@ -165,6 +245,8 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
       bookmaker_name: bookmakerName.trim() || null, 
       bookmaker_link: bookmakerLink.trim() || null,
       odds: odds ? parseFloat(odds) : null,
+      match_date: matchDate || null,
+      fixture_id: fixtureId,
       created_by: user.id,
     };
 
@@ -176,7 +258,7 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
           .from('analyses')
           .update(payload)
           .eq('id', initial.id);
-          
+
         if (error) throw error;
         analysisId = initial.id;
       } else {
@@ -185,7 +267,7 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
           .insert(payload)
           .select()
           .single();
-          
+
         if (error) throw error;
         if (!data?.id) throw new Error('Erro ao criar análise');
         analysisId = data.id;
@@ -193,9 +275,9 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
 
       if (tab === 'structured' && analysisId) {
         await supabase.from('analysis_matches').delete().eq('analysis_id', analysisId);
-        
+
         const validMatches = matches.filter(m => m.home_team.trim() && m.away_team.trim());
-        
+
         if (validMatches.length) {
           const { error: matchesError } = await supabase
             .from('analysis_matches')
@@ -208,7 +290,7 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
               odds: m.odds ? parseFloat(m.odds) : null, 
               match_time: m.match_time || null,
             })));
-            
+
           if (matchesError) throw matchesError;
         }
       }
@@ -221,10 +303,121 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
     } finally {
       setSaving(false);
     }
-  }, [title, sportType, championship, description, imageUrl, isHot, isFeatured, tab, stakeValue, bookmakerName, bookmakerLink, odds, matches, initial, navigate]);
+  }, [title, sportType, championship, description, imageUrl, isHot, isFeatured, tab, stakeValue, bookmakerName, bookmakerLink, odds, matchDate, fixtureId, matches, initial, navigate]);
+
+  const filteredFixtures = todayFixtures.filter((f) => {
+    if (!fixtureSearch.trim()) return true;
+    const search = fixtureSearch.toLowerCase();
+    return (
+      f.teams.home.name.toLowerCase().includes(search) ||
+      f.teams.away.name.toLowerCase().includes(search) ||
+      f.league.name.toLowerCase().includes(search)
+    );
+  });
 
   return (
     <div className="space-y-4 max-w-3xl">
+      {/* ─── TOGGLE API / MANUAL ─── */}
+      <div className="rounded-2xl border border-arena-gray bg-arena-dark p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Link2 className="w-4 h-4 text-arena-green" />
+            <span className="text-sm font-bold">Vincular a Jogo da API</span>
+          </div>
+          <Switch 
+            checked={useApiFixture} 
+            onCheckedChange={(v) => {
+              setUseApiFixture(v);
+              if (!v) clearFixture();
+            }} 
+          />
+        </div>
+        <p className="text-xs text-arena-text-secondary">
+          {useApiFixture 
+            ? 'Selecione um jogo do dia para preencher automaticamente os dados da análise.' 
+            : 'Crie a análise manualmente sem vinculação à API.'}
+        </p>
+      </div>
+
+      {/* ─── API FIXTURE SELECTOR ─── */}
+      {useApiFixture && (
+        <div className="rounded-2xl border border-arena-gray bg-arena-dark p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-arena-text-secondary flex items-center gap-1">
+              <CalendarDays className="w-3 h-3" /> Jogos de Hoje
+            </span>
+            {fixtureId && (
+              <Button 
+                type="button" 
+                size="sm" 
+                variant="ghost" 
+                onClick={clearFixture}
+                className="text-arena-red text-xs h-7"
+              >
+                <X className="w-3 h-3 mr-1" /> Limpar seleção
+              </Button>
+            )}
+          </div>
+
+          {fixtureId ? (
+            <div className="p-3 rounded-xl bg-arena-green/10 border border-arena-green/30 flex items-center gap-3">
+              <Shield className="w-5 h-5 text-arena-green" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold truncate">{title}</p>
+                <p className="text-xs text-arena-text-secondary">{championship} • ID: {fixtureId}</p>
+              </div>
+              <span className="px-2 py-0.5 rounded bg-arena-green text-black text-[10px] font-black">SELECIONADO</span>
+            </div>
+          ) : (
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-arena-text-secondary" />
+                <Input
+                  placeholder="Buscar time ou campeonato..."
+                  value={fixtureSearch}
+                  onChange={(e) => setFixtureSearch(e.target.value)}
+                  className="pl-9 bg-arena-gray/40 border-arena-gray rounded-xl"
+                />
+              </div>
+
+              {loadingFixtures ? (
+                <div className="flex items-center justify-center py-6 gap-2 text-arena-text-secondary">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-xs">Buscando jogos...</span>
+                </div>
+              ) : filteredFixtures.length === 0 ? (
+                <p className="text-xs text-arena-text-secondary text-center py-4">
+                  {fixtureSearch.trim() ? 'Nenhum jogo encontrado.' : 'Nenhum jogo disponível para hoje.'}
+                </p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                  {filteredFixtures.map((f) => (
+                    <button
+                      key={f.fixture.id}
+                      type="button"
+                      onClick={() => selectFixture(f)}
+                      className="w-full text-left p-3 rounded-xl bg-arena-gray/20 border border-arena-gray/30 hover:border-arena-green/50 hover:bg-arena-green/5 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] text-arena-text-secondary font-bold">{f.league.name}</span>
+                        <span className="text-[10px] text-arena-text-secondary">
+                          {new Date(f.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm font-bold">
+                        <span className="truncate">{f.teams.home.name}</span>
+                        <span className="text-arena-text-secondary text-xs">vs</span>
+                        <span className="truncate">{f.teams.away.name}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'image' | 'structured')}>
         <TabsList className="bg-arena-gray/40">
           <TabsTrigger value="image">Imagem</TabsTrigger>
@@ -414,6 +607,17 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
               onChange={(e) => setChampionship(e.target.value)} 
               className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1" 
               placeholder="Ex: Copa do Mundo 2026"
+            />
+          </div>
+        </div>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div>
+            <Label>Data do Jogo</Label>
+            <Input 
+              type="datetime-local"
+              value={matchDate} 
+              onChange={(e) => setMatchDate(e.target.value)} 
+              className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1" 
             />
           </div>
         </div>

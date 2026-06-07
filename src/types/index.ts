@@ -27,6 +27,7 @@ export interface Analysis {
   bookmaker_link: string | null;
   odds: number | null;
   match_date: string | null;
+  fixture_id: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

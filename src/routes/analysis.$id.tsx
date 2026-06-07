@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { AppShell } from '@/components/layout/AppShell';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
+import { useFixtureData } from '@/hooks/use-fixture-data';
+import { FixtureDataPanel } from '@/components/FixtureDataPanel';
 import type { Analysis, AnalysisMatch, UserBet } from '@/types';
 import { Button } from '@/components/ui/button';
 import { SPORTS } from '@/lib/constants';
@@ -21,6 +23,8 @@ function AnalysisDetail() {
   const [analysis, setAnalysis] = useState<(Analysis & { matches: AnalysisMatch[] }) | null>(null);
   const [bet, setBet] = useState<UserBet | null>(null);
   const [registering, setRegistering] = useState(false);
+
+  const { data: fixtureData, loading: fixtureLoading, error: fixtureError } = useFixtureData(analysis?.fixture_id ?? null);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +96,6 @@ function AnalysisDetail() {
 
   return (
     <AppShell>
-      {/* Back button */}
       <button
         onClick={() => navigate({ to: '/' })}
         className="flex items-center gap-2 text-arena-text-secondary hover:text-white mb-4 text-sm transition-colors"
@@ -102,10 +105,26 @@ function AnalysisDetail() {
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
 
-        {/* ─── HEADER: Tags + Título ─── */}
+        {analysis.fixture_id && (
+          <div>
+            {fixtureLoading && (
+              <div className="rounded-2xl border border-arena-gray bg-arena-dark p-6 flex items-center justify-center gap-2 text-arena-text-secondary">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="text-sm">Carregando dados do jogo...</span>
+              </div>
+            )}
+            {fixtureError && (
+              <div className="rounded-2xl border border-arena-red/30 bg-arena-red/10 p-4 text-arena-red text-sm">
+                <p className="font-bold">Erro ao carregar dados do jogo</p>
+                <p className="text-xs">{fixtureError}</p>
+              </div>
+            )}
+            {fixtureData && <FixtureDataPanel data={fixtureData} />}
+          </div>
+        )}
+
         <div>
           <div className="flex items-center gap-2 mb-3 flex-wrap">
-            {/* Sport tag */}
             <span
               className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider"
               style={{ backgroundColor: sport.color + '20', color: sport.color, border: `1px solid ${sport.color}40` }}
@@ -113,7 +132,6 @@ function AnalysisDetail() {
               {sport.name}
             </span>
 
-            {/* Championship */}
             {analysis.championship && (
               <span className="px-2.5 py-1 rounded-full bg-arena-gray text-[10px] font-bold text-arena-text-secondary">
                 <Trophy className="w-3 h-3 inline mr-1" />
@@ -121,21 +139,18 @@ function AnalysisDetail() {
               </span>
             )}
 
-            {/* Hot tag */}
             {analysis.is_hot && (
               <span className="px-2.5 py-1 rounded-full bg-arena-gold/20 text-arena-gold text-[10px] font-black border border-arena-gold/30">
                 <Flame className="w-3 h-3 inline mr-1" /> QUENTE
               </span>
             )}
 
-            {/* Featured tag */}
             {analysis.is_featured && (
               <span className="px-2.5 py-1 rounded-full bg-arena-green/20 text-arena-green text-[10px] font-black border border-arena-green/30">
                 <Star className="w-3 h-3 inline mr-1" /> DESTAQUE
               </span>
             )}
 
-            {/* Status */}
             {analysis.status === 'green' && (
               <span className="px-2.5 py-1 rounded-full bg-arena-success/20 text-arena-success text-[10px] font-black border border-arena-success/30">
                 <Check className="w-3 h-3 inline mr-1" /> GREEN
@@ -155,21 +170,28 @@ function AnalysisDetail() {
 
           <h1 className="text-2xl font-black tracking-tight leading-tight">{analysis.title}</h1>
 
-          {/* Date */}
           <p className="text-xs text-arena-text-secondary mt-2 flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            {new Date(analysis.created_at).toLocaleDateString('pt-BR', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {analysis.match_date
+              ? new Date(analysis.match_date).toLocaleDateString('pt-BR', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : new Date(analysis.created_at).toLocaleDateString('pt-BR', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
           </p>
         </div>
 
-        {/* ─── IMAGE TYPE ─── */}
         {analysis.display_type === 'image' && analysis.image_url && (
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
@@ -180,7 +202,6 @@ function AnalysisDetail() {
           </motion.div>
         )}
 
-        {/* ─── DESCRIPTION ─── */}
         {analysis.description && (
           <div className="rounded-2xl border border-arena-gray bg-arena-dark p-4">
             <p className="text-arena-text-secondary whitespace-pre-line leading-relaxed text-sm">
@@ -189,10 +210,8 @@ function AnalysisDetail() {
           </div>
         )}
 
-        {/* ─── STRUCTURED TYPE INFO ─── */}
         {analysis.display_type === 'structured' && (
-          <>
-            {/* Bookmaker */}
+          <div className="space-y-3">
             {analysis.bookmaker_name && (
               <div className="rounded-2xl border border-arena-gray bg-arena-dark p-4">
                 <p className="text-xs uppercase tracking-widest text-arena-text-secondary mb-2 flex items-center gap-1">
@@ -214,7 +233,6 @@ function AnalysisDetail() {
               </div>
             )}
 
-            {/* Stake & Odds */}
             {(analysis.stake_value || analysis.odds) && (
               <div className="grid grid-cols-2 gap-3">
                 {analysis.stake_value && (
@@ -236,7 +254,6 @@ function AnalysisDetail() {
               </div>
             )}
 
-            {/* Matches */}
             {analysis.matches.length > 0 && (
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-widest text-arena-text-secondary flex items-center gap-1">
@@ -282,10 +299,9 @@ function AnalysisDetail() {
                 ))}
               </div>
             )}
-          </>
+          </div>
         )}
 
-        {/* ─── RESULT (if resolved) ─── */}
         {isResolved && (
           <div className={`rounded-2xl border p-4 text-center ${analysis.status === 'green' ? 'border-arena-success/30 bg-arena-success/10' : 'border-arena-red/30 bg-arena-red/10'}`}>
             <p className={`text-3xl font-black ${analysis.status === 'green' ? 'text-arena-success' : 'text-arena-red'}`}>
@@ -300,7 +316,6 @@ function AnalysisDetail() {
         )}
       </motion.div>
 
-      {/* ─── ACTION BAR ─── */}
       <div className="fixed bottom-16 inset-x-0 z-30 glass border-t border-arena-gray pb-safe">
         <div className="max-w-2xl mx-auto px-4 py-3">
           {bet ? (
