@@ -112,6 +112,10 @@ export interface NewsItem {
   image_url: string | null;
   category: string;
   is_featured: boolean;
+  is_auto: boolean | null;        // ← NOVO
+  source_name: string | null;     // ← NOVO
+  source_url: string | null;     // ← NOVO
+  published_at: string | null;   // ← NOVO
   created_by: string | null;
   created_at: string;
 }
