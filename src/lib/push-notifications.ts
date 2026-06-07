@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 // =============================================================================
 // CHAVE PÚBLICA VAPID — JÁ GERADA E PRONTA
 // =============================================================================
-const VAPID_PUBLIC_KEY = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEefoWKJWO8TJuyG4Bv2_tCZxdRJ1si6xklxNFTMAi3ikS8FHX3OwOMjgDMa6VV2ew0nRb1gTRx6Dg6gTd9h0kWg';
+const VAPID_PUBLIC_KEY = 'BF5uRScWZi9b01r_RzT3u-Uk0-vn6uSkGdX7zy6a0W9xzYgzFWwiREV8aEUC9m3TjLDCsOboxJ3Q8c728S1iK24';
 
 // =============================================================================
 // TIPOS

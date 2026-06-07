@@ -9,8 +9,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 // =============================================================================
 // CONFIGURAÇÃO — SUBSTITUA PELA SUA PRIVATE KEY VAPID
 // =============================================================================
-const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') || 'MHcCAQEEIPiK1st2i5H-vsNa1FdD2IyIe7sNAVo9uRZj2TqlsE2_oAoGCCqGSM49AwEHoUQDQgAEefoWKJWO8TJuyG4Bv2_tCZxdRJ1si6xklxNFTMAi3ikS8FHX3OwOMjgDMa6VV2ew0nRb1gTRx6Dg6gTd9h0kWg';
-const VAPID_PUBLIC_KEY = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEefoWKJWO8TJuyG4Bv2_tCZxdRJ1si6xklxNFTMAi3ikS8FHX3OwOMjgDMa6VV2ew0nRb1gTRx6Dg6gTd9h0kWg';
+const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') || 'cavyUT8pmvmve-OzM6KURI78ydrjbjTpfzhkapwCtE4';
+const VAPID_PUBLIC_KEY = 'BF5uRScWZi9b01r_RzT3u-Uk0-vn6uSkGdX7zy6a0W9xzYgzFWwiREV8aEUC9m3TjLDCsOboxJ3Q8c728S1iK24';
 const VAPID_SUBJECT = 'mailto:admin@apostarestrita.com';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
