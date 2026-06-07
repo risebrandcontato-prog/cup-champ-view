@@ -1,44 +1,56 @@
 // src/components/match/MatchCard.tsx
-// Card de jogo com escudos, placar ao vivo, e badge de análise
+// Card de jogo com escudos do Storage (100% disponível)
 
 import { motion } from 'framer-motion'
 import { Clock, Trophy, Shield } from 'lucide-react'
-import { useState } from 'react'
+import { useTeamLogo } from '@/hooks/use-team-logo'
 import type { Fixture } from '@/hooks/use-fixtures'
 
 interface MatchCardProps {
   fixture: Fixture
   hasAnalysis?: boolean
-  analysisId?: string
   onClick?: () => void
 }
 
-function TeamLogo({ name, logo, size = 40 }: { name: string; logo: string | null; size?: number }) {
-  const [error, setError] = useState(false)
+function TeamLogo({ 
+  name, 
+  logo: apiSportsLogo, 
+  teamId 
+}: { 
+  name: string
+  logo: string | null
+  teamId: number
+}) {
+  const { logo, loading } = useTeamLogo(apiSportsLogo, teamId, name)
 
-  if (!logo || error) {
+  // Loading
+  if (loading) {
     return (
-      <div
-        className="rounded-full bg-arena-gray/60 flex items-center justify-center border border-arena-gray/50"
-        style={{ width: size, height: size }}
-      >
-        <span className="text-xs font-black text-arena-text-secondary">
+      <div className="w-10 h-10 rounded-full bg-arena-gray/50 flex items-center justify-center">
+        <div className="w-4 h-4 border-2 border-arena-green border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  // Sem logo
+  if (!logo) {
+    return (
+      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-arena-green/20 to-arena-gold/20 flex flex-col items-center justify-center border border-arena-green/30">
+        <Shield className="w-4 h-4 text-arena-green mb-0.5" />
+        <span className="text-[7px] font-black text-arena-gold leading-none">
           {name.slice(0, 2).toUpperCase()}
         </span>
       </div>
     )
   }
 
+  // Com logo do Storage
   return (
-    <div
-      className="rounded-full bg-white/10 flex items-center justify-center overflow-hidden p-1"
-      style={{ width: size, height: size }}
-    >
+    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden p-1 border border-white/10">
       <img
         src={logo}
         alt={name}
         className="w-full h-full object-contain"
-        onError={() => setError(true)}
         loading="lazy"
       />
     </div>
@@ -75,21 +87,18 @@ export function MatchCard({ fixture, hasAnalysis, onClick }: MatchCardProps) {
         transition-all
       `}
     >
-      {/* Badge de análise */}
       {hasAnalysis && (
         <div className="absolute top-2 left-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-arena-gold text-black text-[10px] font-black uppercase tracking-wider">
           <Trophy className="w-3 h-3" /> Análise
         </div>
       )}
 
-      {/* Badge LIVE */}
       {isLive && (
         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-arena-red text-white text-[10px] font-black uppercase animate-pulse">
           <span className="w-1.5 h-1.5 rounded-full bg-white" /> LIVE
         </div>
       )}
 
-      {/* Header: Liga + Horário */}
       <div className="px-3 pt-3 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5 min-w-0">
           {league.logo && (
@@ -116,18 +125,19 @@ export function MatchCard({ fixture, hasAnalysis, onClick }: MatchCardProps) {
         </div>
       </div>
 
-      {/* Times e Placar */}
       <div className="px-3 pb-3">
         <div className="flex items-center justify-between">
-          {/* Time Casa */}
           <div className="flex flex-col items-center gap-2 flex-1">
-            <TeamLogo name={teams.home.name} logo={teams.home.logo} />
+            <TeamLogo 
+              name={teams.home.name} 
+              logo={teams.home.logo} 
+              teamId={teams.home.id} 
+            />
             <span className="text-xs font-semibold text-center line-clamp-1 w-full leading-tight">
               {teams.home.name}
             </span>
           </div>
 
-          {/* Placar */}
           <div className="flex flex-col items-center px-3">
             {isLive || isFinished ? (
               <div className="flex items-center gap-2">
@@ -147,9 +157,12 @@ export function MatchCard({ fixture, hasAnalysis, onClick }: MatchCardProps) {
             )}
           </div>
 
-          {/* Time Fora */}
           <div className="flex flex-col items-center gap-2 flex-1">
-            <TeamLogo name={teams.away.name} logo={teams.away.logo} />
+            <TeamLogo 
+              name={teams.away.name} 
+              logo={teams.away.logo} 
+              teamId={teams.away.id} 
+            />
             <span className="text-xs font-semibold text-center line-clamp-1 w-full leading-tight">
               {teams.away.name}
             </span>
@@ -160,7 +173,6 @@ export function MatchCard({ fixture, hasAnalysis, onClick }: MatchCardProps) {
   )
 }
 
-// Componente de loading skeleton
 export function MatchCardSkeleton() {
   return (
     <div className="shrink-0 w-70 rounded-2xl border border-arena-gray bg-arena-dark p-3 animate-pulse">
