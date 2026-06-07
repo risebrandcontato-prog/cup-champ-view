@@ -11,7 +11,7 @@ export function AppHeader() {
       <div className="max-w-2xl mx-auto h-14 px-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <Trophy className="w-5 h-5 text-arena-gold" />
-          <span className="font-black tracking-tight text-arena-gold text-sm">APOSTA RESTRITA</span>
+          <span className="font-black tracking-tight text-arena-gold text-sm">ANÁLISE RESTRITA</span>
         </Link>
         <div className="flex items-center gap-3">
           {isAdmin && (

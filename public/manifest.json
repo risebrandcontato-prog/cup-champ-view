@@ -1,6 +1,6 @@
 {
-  "name": "APOSTA RESTRITA",
-  "short_name": "APOSTA",
+  "name": "ANÁLISE RESTRITA",
+  "short_name": "ANÁLISE RESTRITA",
   "description": "Análises esportivas premium em tempo real",
   "start_url": "/",
   "display": "standalone",

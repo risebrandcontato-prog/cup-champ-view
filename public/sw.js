@@ -86,7 +86,7 @@ routing.setCatchHandler(async ({ event }) => {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>APOSTA RESTRITA — Offline</title>
+<title>ANÁLISE RESTRITA — Offline</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0A0A0A;color:#fff;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;text-align:center}

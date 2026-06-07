@@ -59,7 +59,7 @@ function SidebarContent() {
   return (
     <div className="flex flex-col h-full">
       <div className="p-6 border-b border-arena-gray">
-        <p className="font-black text-arena-gold tracking-tight">APOSTA RESTRITA</p>
+        <p className="font-black text-arena-gold tracking-tight">ANÁLISE RESTRITA</p>
         <p className="text-[10px] uppercase tracking-widest text-arena-text-secondary mt-1 flex items-center gap-1"><Shield className="w-3 h-3" /> Painel Admin</p>
       </div>
       <nav className="flex-1 p-3 space-y-1">

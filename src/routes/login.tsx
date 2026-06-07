@@ -121,7 +121,7 @@ function LoginPage() {
             >
               <img
                 src="/icons/icon-512x512.png"
-                alt="Aposta Restrita"
+                alt="Análise Restrita"
                 className="w-full h-full object-cover"
                 width="112"
                 height="112"
@@ -137,7 +137,7 @@ function LoginPage() {
             transition={{ duration: 0.4, delay: 0.4 }}
             className="text-3xl font-black tracking-tight text-arena-gold"
           >
-            APOSTA RESTRITA
+            ANÁLISE RESTRITA
           </motion.h1>
 
           <motion.p
