@@ -2,7 +2,8 @@
 // Card de jogo com escudos, placar ao vivo, e badge de análise
 
 import { motion } from 'framer-motion'
-import { Clock, Trophy } from 'lucide-react'
+import { Clock, Trophy, Shield } from 'lucide-react'
+import { useState } from 'react'
 import type { Fixture } from '@/hooks/use-fixtures'
 
 interface MatchCardProps {
@@ -12,8 +13,40 @@ interface MatchCardProps {
   onClick?: () => void
 }
 
-export function MatchCard({ fixture, hasAnalysis, analysisId, onClick }: MatchCardProps) {
-  const { teams, goals, fixture: fixtureInfo, league, score } = fixture
+function TeamLogo({ name, logo, size = 40 }: { name: string; logo: string | null; size?: number }) {
+  const [error, setError] = useState(false)
+
+  if (!logo || error) {
+    return (
+      <div
+        className="rounded-full bg-arena-gray/60 flex items-center justify-center border border-arena-gray/50"
+        style={{ width: size, height: size }}
+      >
+        <span className="text-xs font-black text-arena-text-secondary">
+          {name.slice(0, 2).toUpperCase()}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="rounded-full bg-white/10 flex items-center justify-center overflow-hidden p-1"
+      style={{ width: size, height: size }}
+    >
+      <img
+        src={logo}
+        alt={name}
+        className="w-full h-full object-contain"
+        onError={() => setError(true)}
+        loading="lazy"
+      />
+    </div>
+  )
+}
+
+export function MatchCard({ fixture, hasAnalysis, onClick }: MatchCardProps) {
+  const { teams, goals, fixture: fixtureInfo, league } = fixture
   const isLive = fixtureInfo.status.short === 'LIVE' || fixtureInfo.status.short === '1H' || fixtureInfo.status.short === '2H'
   const isFinished = fixtureInfo.status.short === 'FT' || fixtureInfo.status.short === 'AET' || fixtureInfo.status.short === 'PEN'
 
@@ -36,7 +69,7 @@ export function MatchCard({ fixture, hasAnalysis, analysisId, onClick }: MatchCa
       whileHover={{ y: -2 }}
       onClick={onClick}
       className={`
-        relative flex-shrink-0 w-[280px] rounded-2xl border overflow-hidden cursor-pointer
+        relative shrink-0 w-70 rounded-2xl border overflow-hidden cursor-pointer
         ${hasAnalysis ? 'border-arena-gold/50 bg-arena-gold/5' : 'border-arena-gray bg-arena-dark'}
         ${onClick ? 'hover:border-arena-green/50 hover:shadow-lg hover:shadow-arena-green/10' : ''}
         transition-all
@@ -60,7 +93,12 @@ export function MatchCard({ fixture, hasAnalysis, analysisId, onClick }: MatchCa
       <div className="px-3 pt-3 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5 min-w-0">
           {league.logo && (
-            <img src={league.logo} alt={league.name} className="w-4 h-4 object-contain shrink-0" />
+            <img 
+              src={league.logo} 
+              alt={league.name} 
+              className="w-4 h-4 object-contain shrink-0"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
           )}
           <span className="text-[10px] text-arena-text-secondary truncate uppercase tracking-wider">
             {league.country} — {league.name}
@@ -82,17 +120,11 @@ export function MatchCard({ fixture, hasAnalysis, analysisId, onClick }: MatchCa
       <div className="px-3 pb-3">
         <div className="flex items-center justify-between">
           {/* Time Casa */}
-          <div className="flex flex-col items-center gap-1 flex-1">
-            <div className="w-10 h-10 rounded-full bg-arena-gray/50 flex items-center justify-center overflow-hidden">
-              {teams.home.logo ? (
-                <img src={teams.home.logo} alt={teams.home.name} className="w-8 h-8 object-contain" />
-              ) : (
-                <span className="text-xs font-bold text-arena-text-secondary">
-                  {teams.home.name.slice(0, 2).toUpperCase()}
-                </span>
-              )}
-            </div>
-            <span className="text-xs font-semibold text-center line-clamp-1 w-full">{teams.home.name}</span>
+          <div className="flex flex-col items-center gap-2 flex-1">
+            <TeamLogo name={teams.home.name} logo={teams.home.logo} />
+            <span className="text-xs font-semibold text-center line-clamp-1 w-full leading-tight">
+              {teams.home.name}
+            </span>
           </div>
 
           {/* Placar */}
@@ -116,17 +148,11 @@ export function MatchCard({ fixture, hasAnalysis, analysisId, onClick }: MatchCa
           </div>
 
           {/* Time Fora */}
-          <div className="flex flex-col items-center gap-1 flex-1">
-            <div className="w-10 h-10 rounded-full bg-arena-gray/50 flex items-center justify-center overflow-hidden">
-              {teams.away.logo ? (
-                <img src={teams.away.logo} alt={teams.away.name} className="w-8 h-8 object-contain" />
-              ) : (
-                <span className="text-xs font-bold text-arena-text-secondary">
-                  {teams.away.name.slice(0, 2).toUpperCase()}
-                </span>
-              )}
-            </div>
-            <span className="text-xs font-semibold text-center line-clamp-1 w-full">{teams.away.name}</span>
+          <div className="flex flex-col items-center gap-2 flex-1">
+            <TeamLogo name={teams.away.name} logo={teams.away.logo} />
+            <span className="text-xs font-semibold text-center line-clamp-1 w-full leading-tight">
+              {teams.away.name}
+            </span>
           </div>
         </div>
       </div>
@@ -137,20 +163,20 @@ export function MatchCard({ fixture, hasAnalysis, analysisId, onClick }: MatchCa
 // Componente de loading skeleton
 export function MatchCardSkeleton() {
   return (
-    <div className="flex-shrink-0 w-[280px] rounded-2xl border border-arena-gray bg-arena-dark p-3 animate-pulse">
+    <div className="shrink-0 w-70 rounded-2xl border border-arena-gray bg-arena-dark p-3 animate-pulse">
       <div className="flex items-center justify-between mb-3">
         <div className="h-3 w-20 bg-arena-gray/50 rounded" />
         <div className="h-3 w-12 bg-arena-gray/50 rounded" />
       </div>
       <div className="flex items-center justify-between">
-        <div className="flex flex-col items-center gap-1 flex-1">
+        <div className="flex flex-col items-center gap-2 flex-1">
           <div className="w-10 h-10 rounded-full bg-arena-gray/50" />
           <div className="h-3 w-16 bg-arena-gray/50 rounded" />
         </div>
         <div className="px-3">
           <div className="h-6 w-12 bg-arena-gray/50 rounded" />
         </div>
-        <div className="flex flex-col items-center gap-1 flex-1">
+        <div className="flex flex-col items-center gap-2 flex-1">
           <div className="w-10 h-10 rounded-full bg-arena-gray/50" />
           <div className="h-3 w-16 bg-arena-gray/50 rounded" />
         </div>
