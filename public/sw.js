@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // SERVICE WORKER - APOSTA RESTRITA PWA
-// Workbox 7 via CDN (importScripts)
+// Workbox 7 via CDN + Notificações Push VAPID
 // ═══════════════════════════════════════════════════════════════
 
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js');
@@ -9,43 +9,34 @@ workbox.setConfig({ debug: false });
 
 const { precaching, routing, strategies, expiration, cacheableResponse } = workbox;
 
-// ─── Precache manifest (gerado manualmente - atualizar quando mudar assets) ───
-// Estes são os assets críticos que devem estar disponíveis offline
+// ─── Precache manifest ───
 const PRECACHE_ASSETS = [
-  { url: '/', revision: '1.0.0' },
-  { url: '/manifest.json', revision: '1.0.0' },
-  { url: '/icons/icon-192x192.png', revision: '1.0.0' },
-  { url: '/icons/icon-512x512.png', revision: '1.0.0' },
+  { url: '/', revision: '1.0.1' },
+  { url: '/manifest.json', revision: '1.0.1' },
+  { url: '/icons/icon-192x192.png', revision: '1.0.1' },
+  { url: '/icons/icon-512x512.png', revision: '1.0.1' },
 ];
 
 precaching.precacheAndRoute(PRECACHE_ASSETS);
 
-// ─── Cache de páginas (HTML/navegação) ───
+// ─── Cache de páginas ───
 routing.registerRoute(
   ({ request }) => request.mode === 'navigate',
   new strategies.NetworkFirst({
     cacheName: 'pages-cache',
     plugins: [
-      new expiration.ExpirationPlugin({
-        maxEntries: 50,
-        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 dias
-      }),
+      new expiration.ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 }),
     ],
   })
 );
 
-// ─── Cache de assets estáticos (JS, CSS) ───
+// ─── Cache de assets estáticos ───
 routing.registerRoute(
-  ({ request }) =>
-    request.destination === 'script' ||
-    request.destination === 'style',
+  ({ request }) => request.destination === 'script' || request.destination === 'style',
   new strategies.StaleWhileRevalidate({
     cacheName: 'assets-cache',
     plugins: [
-      new expiration.ExpirationPlugin({
-        maxEntries: 100,
-        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 dias
-      }),
+      new expiration.ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 }),
     ],
   })
 );
@@ -56,13 +47,8 @@ routing.registerRoute(
   new strategies.CacheFirst({
     cacheName: 'images-cache',
     plugins: [
-      new expiration.ExpirationPlugin({
-        maxEntries: 200,
-        maxAgeSeconds: 60 * 24 * 60 * 60, // 60 dias
-      }),
-      new cacheableResponse.CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
+      new expiration.ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 60 * 24 * 60 * 60 }),
+      new cacheableResponse.CacheableResponsePlugin({ statuses: [0, 200] }),
     ],
   })
 );
@@ -73,24 +59,18 @@ routing.registerRoute(
   new strategies.CacheFirst({
     cacheName: 'fonts-cache',
     plugins: [
-      new expiration.ExpirationPlugin({
-        maxEntries: 30,
-        maxAgeSeconds: 365 * 24 * 60 * 60, // 1 ano
-      }),
+      new expiration.ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 365 * 24 * 60 * 60 }),
     ],
   })
 );
 
-// ─── Cache de API Supabase (dados) ───
+// ─── Cache de API Supabase ───
 routing.registerRoute(
   ({ url }) => url.hostname.includes('supabase.co'),
   new strategies.NetworkFirst({
     cacheName: 'api-cache',
     plugins: [
-      new expiration.ExpirationPlugin({
-        maxEntries: 100,
-        maxAgeSeconds: 5 * 60, // 5 minutos
-      }),
+      new expiration.ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 5 * 60 }),
     ],
   })
 );
@@ -130,7 +110,7 @@ button{background:#00C853;color:#000;border:none;padding:14px 32px;border-radius
   return Response.error();
 });
 
-// ─── Skip waiting + Claim clients (update sem reload forçado) ───
+// ─── Skip waiting + Claim clients ───
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -139,11 +119,82 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// ─── Message handler para comunicação com o app ───
+// ─── Message handler ───
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-console.log('[SW] APOSTA RESTRITA PWA Service Worker ativo');
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICAÇÕES PUSH VAPID — FUNCIONA COM TELA BLOQUEADA
+// ═══════════════════════════════════════════════════════════════
+
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push received', event);
+
+  let data = {
+    title: 'Nova Análise Disponível',
+    body: 'O admin publicou uma nova análise!',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-72x72.png',
+    tag: 'new-analysis',
+    requireInteraction: false,
+    data: { url: '/', type: 'analysis' },
+  };
+
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    }
+  } catch (e) {
+    console.error('[SW] Error parsing push data', e);
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || '/icons/icon-192x192.png',
+    badge: data.badge || '/icons/icon-72x72.png',
+    tag: data.tag || 'default',
+    requireInteraction: data.requireInteraction ?? false,
+    vibrate: [200, 100, 200],
+    data: data.data || { url: '/' },
+    actions: data.actions || [
+      { action: 'open', title: 'Ver Agora', icon: '/icons/icon-72x72.png' },
+    ],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification clicked', event);
+  event.notification.close();
+
+  const urlToOpen = event.notification.data?.url || '/';
+
+  if (event.action === 'open') {
+    event.waitUntil(self.clients.openWindow(urlToOpen));
+    return;
+  }
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url === urlToOpen && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(urlToOpen);
+        }
+      })
+  );
+});
+
+console.log('[SW] APOSTA RESTRITA PWA Service Worker ativo (com Push VAPID)');

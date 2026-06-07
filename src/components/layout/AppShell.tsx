@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { AppHeader } from './AppHeader';
 import { BottomNav } from './BottomNav';
 import { Loader2 } from 'lucide-react';
+import { initPushNotifications } from '@/lib/push-notifications';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -14,6 +15,22 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!user) { navigate({ to: '/login' }); return; }
     if (profile && !profile.onboarding_completed) { navigate({ to: '/complete-profile' }); }
   }, [user, profile, loading, navigate]);
+
+  // =============================================================================
+  // REGISTRA NOTIFICAÇÕES PUSH AO ABRIR O APP (só se logado e onboarding completo)
+  // =============================================================================
+  useEffect(() => {
+    if (!user || !profile?.onboarding_completed) return;
+
+    // Delay de 2s para não travar a abertura do app
+    const timer = setTimeout(() => {
+      initPushNotifications(user.id).catch((err) => {
+        console.warn('[AppShell] Push init failed (non-critical):', err);
+      });
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [user, profile?.onboarding_completed]);
 
   if (loading || !user) {
     return (

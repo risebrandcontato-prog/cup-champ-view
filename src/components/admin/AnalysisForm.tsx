@@ -7,11 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Plus, X, Loader2, AlertTriangle, Search, Link2, RefreshCw, Shield, CalendarDays } from 'lucide-react';
+import { Upload, Plus, X, Loader2, AlertTriangle, Search, Link2, CalendarDays, Shield } from 'lucide-react';
 import { SPORTS, BET_TYPES } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useNavigate } from '@tanstack/react-router';
 import type { Analysis, AnalysisMatch } from '@/types';
+import { sendPushNotification } from '@/lib/send-notification';
 
 interface MatchInput { 
   home_team: string; 
@@ -136,7 +137,6 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
     setSportType('futebol');
     setTab('structured');
 
-    // Preenche automaticamente um match
     setMatches([{
       home_team: home,
       away_team: away,
@@ -292,6 +292,33 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
             })));
 
           if (matchesError) throw matchesError;
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // DISPARAR NOTIFICAÇÃO PUSH PARA TODOS OS USUÁRIOS
+      // ═══════════════════════════════════════════════════════════════
+      if (!initial?.id && analysisId) {
+        // Só envia notificação em NOVA análise (não em edição)
+        const pushTitle = isHot ? '🔥 ' + title.trim() : '⚽ ' + title.trim();
+        const pushBody = description.trim().slice(0, 120) || 'Nova análise esportiva disponível!';
+
+        const pushResult = await sendPushNotification({
+          title: pushTitle,
+          body: pushBody,
+          tag: `analysis-${analysisId}`,
+          url: `/analysis/${analysisId}`,
+          icon: '/icons/icon-192x192.png',
+          badge: '/icons/icon-72x72.png',
+          requireInteraction: false,
+        });
+
+        if (pushResult.success) {
+          console.log(`[AnalysisForm] Push sent to ${pushResult.sent} users`);
+          toast.success(`Notificação enviada para ${pushResult.sent} usuários`);
+        } else {
+          console.warn('[AnalysisForm] Push failed:', pushResult.error);
+          // Não bloqueia o fluxo — a análise já foi salva
         }
       }
 
