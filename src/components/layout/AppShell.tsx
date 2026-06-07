@@ -17,19 +17,33 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [user, profile, loading, navigate]);
 
   // =============================================================================
-  // REGISTRA NOTIFICAÇÕES PUSH AO ABRIR O APP (só se logado e onboarding completo)
+  // REGISTRA NOTIFICAÇÕES PUSH AO ABRIR O APP
+  // Só se logado, onboarding completo, e com delay para não travar
   // =============================================================================
   useEffect(() => {
     if (!user || !profile?.onboarding_completed) return;
 
-    // Delay de 2s para não travar a abertura do app
-    const timer = setTimeout(() => {
-      initPushNotifications(user.id).catch((err) => {
-        console.warn('[AppShell] Push init failed (non-critical):', err);
-      });
-    }, 2000);
+    let cancelled = false;
 
-    return () => clearTimeout(timer);
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+
+      try {
+        const success = await initPushNotifications(user.id);
+        if (success) {
+          console.log('[AppShell] Push notifications initialized');
+        } else {
+          console.warn('[AppShell] Push init returned false (permission denied or unsupported)');
+        }
+      } catch (err) {
+        console.warn('[AppShell] Push init failed (non-critical):', err);
+      }
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [user, profile?.onboarding_completed]);
 
   if (loading || !user) {

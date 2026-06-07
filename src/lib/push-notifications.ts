@@ -1,6 +1,6 @@
 // src/lib/push-notifications.ts
 // Helper completo para Notificações Push VAPID
-// Sem erros TypeScript — 100% funcional
+// Robusto: idempotente, retry, compatível com navegador e PWA instalado
 
 import { supabase } from '@/integrations/supabase/client';
 
@@ -32,7 +32,21 @@ export interface NotificationPayload {
 }
 
 // =============================================================================
-// 1. REGISTRAR SERVICE WORKER
+// UTIL: converter base64url → ArrayBuffer (compatível com PushManager)
+// =============================================================================
+function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray.buffer;
+}
+
+// =============================================================================
+// 1. REGISTRAR SERVICE WORKER (com retry e update check)
 // =============================================================================
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator)) {
@@ -41,6 +55,19 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 
   try {
+    const existingReg = await navigator.serviceWorker.getRegistration('/');
+
+    if (existingReg) {
+      console.log('[Push] SW already registered:', existingReg.scope);
+      try {
+        await existingReg.update();
+        console.log('[Push] SW update checked');
+      } catch {
+        // ignore
+      }
+      return existingReg;
+    }
+
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
       updateViaCache: 'imports',
@@ -82,35 +109,44 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 }
 
 // =============================================================================
-// 3. CONVERTER VAPID KEY (base64url → Uint8Array)
-// =============================================================================
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-
-// =============================================================================
-// 4. SUBSCREVER NO PUSH
+// 3. SUBSCREVER NO PUSH (idempotente — não duplica no banco)
 // =============================================================================
 export async function subscribeToPush(userId: string): Promise<PushSubscriptionData | null> {
   try {
     const registration = await navigator.serviceWorker.ready;
     let subscription = await registration.pushManager.getSubscription();
 
-    if (!subscription) {
+    if (subscription) {
+      console.log('[Push] Already subscribed, checking validity...');
+      const subJson = subscription.toJSON();
+
+      const { data: existing, error: checkError } = await (supabase as any)
+        .from('push_subscriptions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('endpoint', subJson.endpoint)
+        .maybeSingle();
+
+      if (!checkError && existing) {
+        console.log('[Push] Subscription already saved in DB');
+        return {
+          endpoint: subJson.endpoint!,
+          keys: {
+            p256dh: subJson.keys?.p256dh || '',
+            auth: subJson.keys?.auth || '',
+          },
+        };
+      }
+
+      console.log('[Push] Subscription not in DB, saving...');
+    } else {
+      console.log('[Push] Creating new subscription...');
+      const appServerKey = urlBase64ToArrayBuffer(VAPID_PUBLIC_KEY);
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as BufferSource,
+        applicationServerKey: appServerKey,
       });
       console.log('[Push] New subscription created');
-    } else {
-      console.log('[Push] Already subscribed');
     }
 
     const subJson = subscription.toJSON();
@@ -148,7 +184,7 @@ export async function subscribeToPush(userId: string): Promise<PushSubscriptionD
 }
 
 // =============================================================================
-// 5. CANCELAR SUBSCRIÇÃO
+// 4. CANCELAR SUBSCRIÇÃO
 // =============================================================================
 export async function unsubscribeFromPush(userId: string): Promise<boolean> {
   try {
@@ -170,21 +206,29 @@ export async function unsubscribeFromPush(userId: string): Promise<boolean> {
 }
 
 // =============================================================================
-// 6. FLUXO COMPLETO
+// 5. FLUXO COMPLETO
 // =============================================================================
 export async function initPushNotifications(userId: string): Promise<boolean> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[Push] Push notifications not supported');
+    return false;
+  }
+
   const registration = await registerServiceWorker();
   if (!registration) return false;
 
   const permission = await requestNotificationPermission();
-  if (permission !== 'granted') return false;
+  if (permission !== 'granted') {
+    console.warn('[Push] Permission denied');
+    return false;
+  }
 
   const subscription = await subscribeToPush(userId);
   return !!subscription;
 }
 
 // =============================================================================
-// 7. TESTE LOCAL
+// 6. NOTIFICAÇÃO LOCAL
 // =============================================================================
 export async function sendLocalNotification(payload: NotificationPayload): Promise<void> {
   if (Notification.permission !== 'granted') return;
@@ -197,9 +241,9 @@ export async function sendLocalNotification(payload: NotificationPayload): Promi
     tag: payload.tag || 'test',
     data: { url: payload.url || '/' },
     requireInteraction: payload.requireInteraction ?? false,
-    // @ts-ignore — actions não está no tipo NotificationOptions mas funciona no Chrome/Android
+    // @ts-ignore
     actions: payload.actions || [{ action: 'open', title: 'Ver Agora' }],
-    // @ts-ignore — vibrate não está no tipo NotificationOptions mas funciona no Chrome/Android
+    // @ts-ignore
     vibrate: [200, 100, 200],
   });
 }

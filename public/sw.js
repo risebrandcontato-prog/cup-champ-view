@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-// SERVICE WORKER - APOSTA RESTRITA PWA
-// Workbox 7 via CDN + Notificações Push VAPID
+// SERVICE WORKER — APOSTA RESTRITA PWA v1.0.2
+// Workbox 7 + Push VAPID + Forced Update
 // ═══════════════════════════════════════════════════════════════
 
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js');
@@ -9,12 +9,14 @@ workbox.setConfig({ debug: false });
 
 const { precaching, routing, strategies, expiration, cacheableResponse } = workbox;
 
+const SW_VERSION = '1.0.2';
+
 // ─── Precache manifest ───
 const PRECACHE_ASSETS = [
-  { url: '/', revision: '1.0.1' },
-  { url: '/manifest.json', revision: '1.0.1' },
-  { url: '/icons/icon-192x192.png', revision: '1.0.1' },
-  { url: '/icons/icon-512x512.png', revision: '1.0.1' },
+  { url: '/', revision: SW_VERSION },
+  { url: '/manifest.json', revision: SW_VERSION },
+  { url: '/icons/icon-192x192.png', revision: SW_VERSION },
+  { url: '/icons/icon-512x512.png', revision: SW_VERSION },
 ];
 
 precaching.precacheAndRoute(PRECACHE_ASSETS);
@@ -110,13 +112,29 @@ button{background:#00C853;color:#000;border:none;padding:14px 32px;border-radius
   return Response.error();
 });
 
-// ─── Skip waiting + Claim clients ───
+// ═══════════════════════════════════════════════════════════════
+// INSTALL / ACTIVATE — Forced update para PWA
+// ═══════════════════════════════════════════════════════════════
+
 self.addEventListener('install', (event) => {
+  console.log(`[SW] Installing v${SW_VERSION}`);
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  console.log(`[SW] Activated v${SW_VERSION}`);
+  event.waitUntil(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
+        cacheNames
+          .filter((name) => !name.startsWith('workbox-'))
+          .map((name) => {
+            console.log(`[SW] Clearing old cache: ${name}`);
+            return caches.delete(name);
+          })
+      )
+    ).then(() => self.clients.claim())
+  );
 });
 
 // ─── Message handler ───
@@ -124,10 +142,13 @@ self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+  if (event.data?.type === 'GET_VERSION') {
+    event.ports[0].postMessage(SW_VERSION);
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════
-// NOTIFICAÇÕES PUSH VAPID — FUNCIONA COM TELA BLOQUEADA
+// NOTIFICAÇÕES PUSH VAPID
 // ═══════════════════════════════════════════════════════════════
 
 self.addEventListener('push', (event) => {
@@ -158,8 +179,10 @@ self.addEventListener('push', (event) => {
     badge: data.badge || '/icons/icon-72x72.png',
     tag: data.tag || 'default',
     requireInteraction: data.requireInteraction ?? false,
+    // @ts-ignore
     vibrate: [200, 100, 200],
     data: data.data || { url: '/' },
+    // @ts-ignore
     actions: data.actions || [
       { action: 'open', title: 'Ver Agora', icon: '/icons/icon-72x72.png' },
     ],
@@ -197,4 +220,4 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-console.log('[SW] APOSTA RESTRITA PWA Service Worker ativo (com Push VAPID)');
+console.log(`[SW] APOSTA RESTRITA PWA Service Worker v${SW_VERSION} ativo`);

@@ -1,107 +1,162 @@
 // @ts-nocheck
 // supabase/functions/send-push-notification/index.ts
-// Edge Function que envia notificações push VAPID para todos os usuários
-// Usa a Private Key VAPID para assinar e enviar via protocolo Web Push
-// RODA NO DENO DO SUPABASE — não no Node.js do projeto
+// Edge Function V7 — VAPID JWT com conversão DER→raw correta
+// Solução definitiva para notificações push em todos os dispositivos
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 // =============================================================================
-// CONFIGURAÇÃO — SUBSTITUA PELA SUA PRIVATE KEY VAPID
+// CONFIGURAÇÃO VAPID
 // =============================================================================
 const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') || '';
-const VAPID_PUBLIC_KEY = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAELEcy0rFkdAnUxqe7CBzJgYVz4yQAxddEzgR4kxrU7QmysfyFdCOa6IDZHjkuZDCErvCBWkmnBw8cPUZSy9n40Q';
+const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY') || '';
 const VAPID_SUBJECT = 'mailto:admin@apostarestrita.com';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 // =============================================================================
-// TIPOS
+// UTILS: Base64url
 // =============================================================================
-interface PushSubscription {
-  user_id: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
+function base64urlDecode(str: string): Uint8Array {
+  const padding = '='.repeat((4 - (str.length % 4)) % 4);
+  const base64 = (str + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i);
+  }
+  return bytes;
 }
 
-interface NotificationPayload {
-  title: string;
-  body: string;
-  icon?: string;
-  badge?: string;
-  tag?: string;
-  url?: string;
-  requireInteraction?: boolean;
-}
-
-// =============================================================================
-// UTILS: Base64url → base64 padrão
-// =============================================================================
-function base64urlToBase64(base64url: string): string {
-  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
-  return base64 + padding;
+function base64urlEncode(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 // =============================================================================
-// UTILS: JWT para VAPID
+// CONVERTER ASSINATURA DER ECDSA → RAW R||S (64 bytes)
+// Web Crypto retorna DER, mas JWT VAPID precisa de raw concatenado
 // =============================================================================
-async function createVapidJWT(): Promise<string> {
-  const header = { typ: 'JWT', alg: 'ES256' };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    aud: 'https://fcm.googleapis.com',
-    exp: now + 12 * 3600,
-    sub: VAPID_SUBJECT,
+function derToRaw(signature: Uint8Array): Uint8Array {
+  if (signature[0] !== 0x30) {
+    throw new Error('Invalid DER signature: expected 0x30');
+  }
+
+  let idx = 2; // skip 0x30 and total length byte
+
+  // R component
+  if (signature[idx] !== 0x02) throw new Error('Invalid DER: expected 0x02 for R');
+  idx++;
+  const rLen = signature[idx];
+  idx++;
+  const rBytes = signature.slice(idx, idx + rLen);
+  idx += rLen;
+
+  // S component
+  if (signature[idx] !== 0x02) throw new Error('Invalid DER: expected 0x02 for S');
+  idx++;
+  const sLen = signature[idx];
+  idx++;
+  const sBytes = signature.slice(idx, idx + sLen);
+
+  // Pad to 32 bytes each (P-256 field size)
+  const r = new Uint8Array(32);
+  const s = new Uint8Array(32);
+  const rStart = rBytes.length > 32 ? rBytes.length - 32 : 0;
+  const sStart = sBytes.length > 32 ? sBytes.length - 32 : 0;
+  r.set(rBytes.slice(rStart), 32 - (rBytes.length - rStart));
+  s.set(sBytes.slice(sStart), 32 - (sBytes.length - sStart));
+
+  const raw = new Uint8Array(64);
+  raw.set(r, 0);
+  raw.set(s, 32);
+  return raw;
+}
+
+// =============================================================================
+// CRIAR VAPID JWT
+// =============================================================================
+async function createVapidJWT(audience: string): Promise<string> {
+  const privateKeyRaw = base64urlDecode(VAPID_PRIVATE_KEY);
+  const publicKeyRaw = base64urlDecode(VAPID_PUBLIC_KEY);
+
+  if (publicKeyRaw.length !== 65 || publicKeyRaw[0] !== 0x04) {
+    throw new Error('Invalid public key: must be 65 bytes uncompressed P-256');
+  }
+
+  const x = publicKeyRaw.slice(1, 33);
+  const y = publicKeyRaw.slice(33, 65);
+  const d = privateKeyRaw;
+
+  if (d.length !== 32) {
+    throw new Error(`Invalid private key: must be 32 bytes, got ${d.length}`);
+  }
+
+  const jwk = {
+    kty: 'EC',
+    crv: 'P-256',
+    x: base64urlEncode(x),
+    y: base64urlEncode(y),
+    d: base64urlEncode(d),
+    ext: true,
   };
 
-  const encodedHeader = btoa(JSON.stringify(header));
-  const encodedPayload = btoa(JSON.stringify(payload));
-  const signingInput = `${encodedHeader}.${encodedPayload}`;
-
-  const privateKeyDer = Uint8Array.from(
-    atob(base64urlToBase64(VAPID_PRIVATE_KEY)),
-    (c) => c.charCodeAt(0)
-  );
-
   const privateKey = await crypto.subtle.importKey(
-    'pkcs8',
-    privateKeyDer.buffer,
+    'jwk',
+    jwk,
     { name: 'ECDSA', namedCurve: 'P-256' },
     false,
     ['sign']
   );
 
-  const signature = await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
-    privateKey,
-    new TextEncoder().encode(signingInput)
+  const now = Math.floor(Date.now() / 1000);
+  const header = { typ: 'JWT', alg: 'ES256' };
+  const payload = {
+    aud: audience,
+    exp: now + 12 * 3600,
+    sub: VAPID_SUBJECT,
+  };
+
+  const encodedHeader = base64urlEncode(new TextEncoder().encode(JSON.stringify(header)));
+  const encodedPayload = base64urlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  const signatureDer = new Uint8Array(
+    await crypto.subtle.sign(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      privateKey,
+      new TextEncoder().encode(signingInput)
+    )
   );
 
-  const encodedSignature = btoa(
-    String.fromCharCode(...new Uint8Array(signature))
-  );
+  const signatureRaw = derToRaw(signatureDer);
+  const encodedSignature = base64urlEncode(signatureRaw);
 
   return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
 }
 
 // =============================================================================
-// ENVIAR PUSH PARA UM SUBSCRIPTION
+// ENVIAR PUSH
 // =============================================================================
 async function sendPush(
-  subscription: PushSubscription,
-  payload: NotificationPayload
+  sub: { endpoint: string; p256dh: string; auth: string },
+  payload: Record<string, unknown>
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const vapidJWT = await createVapidJWT();
+    const endpoint = new URL(sub.endpoint);
+    const audience = `${endpoint.protocol}//${endpoint.host}`;
+    const jwt = await createVapidJWT(audience);
+
     const pushPayload = JSON.stringify(payload);
 
-    const response = await fetch(subscription.endpoint, {
+    const response = await fetch(sub.endpoint, {
       method: 'POST',
       headers: {
-        'Authorization': `vapid t=${vapidJWT}, k=${VAPID_PUBLIC_KEY}`,
+        'Authorization': `vapid t=${jwt}, k=${VAPID_PUBLIC_KEY}`,
         'Content-Type': 'application/json',
         'TTL': '86400',
       },
@@ -110,53 +165,16 @@ async function sendPush(
 
     if (response.ok) {
       return { success: true };
-    } else {
-      const errorText = await response.text();
-      if (response.status === 410 || response.status === 404) {
-        return { success: false, error: 'expired' };
-      }
-      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
     }
-  } catch (error) {
-    return { success: false, error: String(error) };
+
+    const errorText = await response.text();
+    if (response.status === 410 || response.status === 404) {
+      return { success: false, error: 'expired' };
+    }
+    return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+  } catch (err) {
+    return { success: false, error: String(err) };
   }
-}
-
-// =============================================================================
-// BUSCAR TODAS AS SUBSCRIPTIONS DO SUPABASE
-// =============================================================================
-async function getAllSubscriptions(): Promise<PushSubscription[]> {
-  const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/push_subscriptions?select=user_id,endpoint,p256dh,auth`,
-    {
-      headers: {
-        'apikey': SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch subscriptions: ${response.status}`);
-  }
-
-  return await response.json();
-}
-
-// =============================================================================
-// REMOVER SUBSCRIPTION EXPIRADA
-// =============================================================================
-async function removeSubscription(endpoint: string): Promise<void> {
-  await fetch(
-    `${SUPABASE_URL}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(endpoint)}`,
-    {
-      method: 'DELETE',
-      headers: {
-        'apikey': SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    }
-  );
 }
 
 // =============================================================================
@@ -176,7 +194,7 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { title, body: messageBody, icon, badge, tag, url, requireInteraction } = body;
+    const { title, body: messageBody, ...rest } = body;
 
     if (!title || !messageBody) {
       return new Response(
@@ -185,63 +203,78 @@ serve(async (req: Request) => {
       );
     }
 
-    const payload: NotificationPayload = {
+    const payload = {
       title,
       body: messageBody,
-      icon: icon || '/icons/icon-192x192.png',
-      badge: badge || '/icons/icon-72x72.png',
-      tag: tag || 'default',
-      url: url || '/',
-      requireInteraction: requireInteraction ?? false,
+      icon: rest.icon || '/icons/icon-192x192.png',
+      badge: rest.badge || '/icons/icon-72x72.png',
+      tag: rest.tag || 'default',
+      url: rest.url || '/',
+      requireInteraction: rest.requireInteraction ?? false,
     };
 
-    const subscriptions = await getAllSubscriptions();
-    console.log(`[Push] Sending to ${subscriptions.length} subscriptions`);
-
-    const results = await Promise.allSettled(
-      subscriptions.map(async (sub) => {
-        const result = await sendPush(sub, payload);
-        if (result.error === 'expired') {
-          await removeSubscription(sub.endpoint);
-          console.log(`[Push] Removed expired subscription for user ${sub.user_id}`);
-        }
-        return result;
-      })
-    );
-
-    const successCount = results.filter(
-      (r) => r.status === 'fulfilled' && r.value.success
-    ).length;
-    const failCount = results.length - successCount;
-
-    console.log(`[Push] Success: ${successCount}, Failed: ${failCount}`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        sent: successCount,
-        failed: failCount,
-        total: subscriptions.length,
-      }),
+    // Buscar subscriptions
+    const subsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/push_subscriptions?select=*`,
       {
-        status: 200,
         headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         },
       }
+    );
+
+    if (!subsRes.ok) {
+      throw new Error(`Failed to fetch subscriptions: ${subsRes.status}`);
+    }
+
+    const subscriptions = await subsRes.json();
+    console.log(`[Push] Found ${subscriptions.length} subscriptions`);
+
+    if (subscriptions.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, sent: 0, failed: 0, total: 0 }),
+        { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+      );
+    }
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const sub of subscriptions) {
+      const result = await sendPush(sub, payload);
+      if (result.success) {
+        sent++;
+        console.log(`[Push] OK: ${sub.endpoint.substring(0, 40)}...`);
+      } else {
+        failed++;
+        console.error(`[Push] FAIL: ${result.error}`);
+        if (result.error === 'expired') {
+          await fetch(
+            `${SUPABASE_URL}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'apikey': SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              },
+            }
+          );
+        }
+      }
+    }
+
+    console.log(`[Push] Result: sent=${sent}, failed=${failed}`);
+
+    return new Response(
+      JSON.stringify({ success: true, sent, failed, total: subscriptions.length }),
+      { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
     );
   } catch (error) {
-    console.error('[Push] Error:', error);
+    console.error('[Push] Fatal:', error);
     return new Response(
       JSON.stringify({ error: String(error) }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
+      { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
     );
   }
 });
