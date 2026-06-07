@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    
+
     if (!supabaseUrl || !supabaseKey) {
       return new Response(
         JSON.stringify({ error: 'Supabase credentials not configured' }),
@@ -114,13 +114,51 @@ Deno.serve(async (req) => {
     console.log('[api-football] Fetching:', url.toString())
 
     // Call API-Sports
-    const response = await fetch(url.toString(), {
+    let response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'x-apisports-key': apiKey,
         'Accept': 'application/json',
       },
     })
+
+    let apiData = await response.json()
+
+    // FALLBACK: se fixtures com date retornar vazio, tentar live=all
+    if (endpoint === 'fixtures' && params.date && (!apiData.response || apiData.response.length === 0)) {
+      console.log('[api-football] Date empty, trying live=all fallback')
+      const liveUrl = new URL(`${API_SPORTS_BASE}/fixtures`)
+      liveUrl.searchParams.append('live', 'all')
+
+      response = await fetch(liveUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'x-apisports-key': apiKey,
+          'Accept': 'application/json',
+        },
+      })
+
+      apiData = await response.json()
+      console.log('[api-football] Live fallback results:', apiData.results || 0)
+    }
+
+    // FALLBACK: se ainda vazio, tentar sem nenhum filtro (últimos jogos)
+    if (endpoint === 'fixtures' && (!apiData.response || apiData.response.length === 0)) {
+      console.log('[api-football] Live empty, trying last=10 fallback')
+      const lastUrl = new URL(`${API_SPORTS_BASE}/fixtures`)
+      lastUrl.searchParams.append('last', '10')
+
+      response = await fetch(lastUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'x-apisports-key': apiKey,
+          'Accept': 'application/json',
+        },
+      })
+
+      apiData = await response.json()
+      console.log('[api-football] Last fallback results:', apiData.results || 0)
+    }
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -134,8 +172,6 @@ Deno.serve(async (req) => {
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    const apiData = await response.json()
 
     // Save to cache
     const ttl = CACHE_TTL[endpoint as keyof typeof CACHE_TTL] || CACHE_TTL.default
