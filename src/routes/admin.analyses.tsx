@@ -1,4 +1,5 @@
-import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
+// src/routes/admin.analyses.tsx
+import { createFileRoute, Link, Outlet, useLocation } from '@tanstack/react-router';
 import { useEffect, useState, useCallback } from 'react';
 import { AdminPageHeader } from './admin';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,8 +56,9 @@ function AnalysesAdmin() {
     load();
   };
 
-  // Verifica se está em uma rota filha (new ou edit)
-  const { pathname } = Route.useLocation ? Route.useLocation() : { pathname: '' };
+  // ✅ CORRIGIDO: useLocation é hook, não Route.useLocation
+  const location = useLocation();
+  const pathname = location.pathname;
   const isChildRoute = pathname.includes('/new') || pathname.includes('/edit');
 
   return (
