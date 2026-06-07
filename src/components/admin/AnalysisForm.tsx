@@ -101,60 +101,20 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
 
     (async () => {
       try {
-        // Buscar jogos ao vivo + próximos 3 dias
         const today = new Date().toISOString().split('T')[0];
-        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
-        // Tentar buscar ao vivo primeiro
-        const { data: liveData, error: liveError } = await supabase.functions.invoke('api-football', {
+        const { data, error } = await supabase.functions.invoke('api-football', {
           body: {
             endpoint: 'fixtures',
-            params: { live: 'all' },
+            params: { date: today, timezone: 'America/Sao_Paulo' },
           },
         });
-
-        // Buscar jogos do dia
-        const { data: todayData, error: todayError } = await supabase.functions.invoke('api-football', {
-          body: {
-            endpoint: 'fixtures',
-            params: { date: today },
-          },
-        });
-
-        // Buscar jogos de amanhã
-        const { data: tomorrowData, error: tomorrowError } = await supabase.functions.invoke('api-football', {
-          body: {
-            endpoint: 'fixtures',
-            params: { date: tomorrow },
-          },
-        });
-
         if (cancelled) return;
-
-        // Combinar todos os resultados
-        const allFixtures = [
-          ...(liveData?.response || []),
-          ...(todayData?.response || []),
-          ...(tomorrowData?.response || []),
-        ];
-
-        // Remover duplicados por fixture.id
-        const uniqueFixtures = allFixtures.filter((f: any, index: number, self: any[]) => 
-          index === self.findIndex((t: any) => t?.fixture?.id === f?.fixture?.id)
-        );
-
-        const fixtures = uniqueFixtures.filter((f: any) => 
-          f?.fixture?.id && f?.teams?.home?.name && f?.teams?.away?.name
-        );
-
+        if (error) throw error;
+        const fixtures = (data?.response || []).filter((f: any) => f?.fixture?.id && f?.teams?.home?.name && f?.teams?.away?.name);
         setTodayFixtures(fixtures);
-
-        if (fixtures.length === 0) {
-          toast.info('Nenhum jogo encontrado para hoje/amanhã. Tente criar análise manual.');
-        }
       } catch (err) {
         console.error('[AnalysisForm] Erro ao buscar jogos:', err);
-        if (!cancelled) toast.error('Erro ao buscar jogos da API');
+        if (!cancelled) toast.error('Erro ao buscar jogos do dia');
       } finally {
         if (!cancelled) setLoadingFixtures(false);
       }
@@ -427,7 +387,7 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
                 </div>
               ) : filteredFixtures.length === 0 ? (
                 <p className="text-xs text-arena-text-secondary text-center py-4">
-                  {fixtureSearch.trim() ? 'Nenhum jogo encontrado.' : 'Nenhum jogo encontrado. Tente buscar manualmente ou crie análise sem vincular.'}
+                  {fixtureSearch.trim() ? 'Nenhum jogo encontrado.' : 'Nenhum jogo disponível para hoje.'}
                 </p>
               ) : (
                 <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
