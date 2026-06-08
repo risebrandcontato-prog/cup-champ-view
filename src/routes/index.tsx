@@ -3,19 +3,21 @@
 // Bem-vindo personalizado, stats, análises, notícias preview, efeitos
 
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Flame, Star, TrendingUp, Calendar, Trophy, Zap, ChevronRight,
   Crown, Sparkles, Activity, BarChart3, ArrowUpRight, Globe,
-  ShieldCheck, Clock, Newspaper, Target, Percent
+  ShieldCheck, Clock, Newspaper, Target, Percent, Ticket,
+  ChevronLeft, X, Filter, Search, Hash, Award, Footprints,
+  type LucideIcon
 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { useAuth, db } from '@/hooks/use-auth'
-import { SPORTS, COUNTRIES } from '@/lib/constants'
+import { SPORTS, COUNTRIES, BOOKMAKERS } from '@/lib/constants'
 import { useFixtures } from '@/hooks/use-fixtures'
 import { MatchCard, MatchCardSkeleton } from '@/components/match/MatchCard'
-import type { Analysis, NewsItem } from '@/types'
+import type { Analysis, NewsItem, AnalysisBet } from '@/types'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const Route = createFileRoute('/')({
@@ -28,16 +30,19 @@ export const Route = createFileRoute('/')({
 function HomePage() {
   const { profile, user } = useAuth()
   const [sport, setSport] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [items, setItems] = useState<Analysis[] | null>(null)
   const [newsPreview, setNewsPreview] = useState<NewsItem[] | null>(null)
-  const [stats, setStats] = useState({ total: 0, hot: 0, green: 0, pending: 0 })
+  const [stats, setStats] = useState({ total: 0, hot: 0, green: 0, pending: 0, greenRate: 0 })
 
   const { fixtures, loading: fixturesLoading, error: fixturesError } = useFixtures()
 
   // Detectar país do usuário (fallback Brasil)
-  const userCountry = COUNTRIES.find(
-    c => c.name.toLowerCase() === (profile?.favorite_national_team ?? '').toLowerCase()
-  ) ?? COUNTRIES[0] // Brasil
+  const userCountry = useMemo(() => {
+    return COUNTRIES.find(
+      c => c.name.toLowerCase() === (profile?.favorite_national_team ?? '').toLowerCase()
+    ) ?? COUNTRIES[0]
+  }, [profile?.favorite_national_team])
 
   useEffect(() => {
     setItems(null)
@@ -45,18 +50,22 @@ function HomePage() {
       .from('analyses')
       .select('*')
       .order('is_hot', { ascending: false })
+      .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(80)
 
     if (sport !== 'all') q = q.eq('sport_type', sport)
     q.then(({ data }: { data: Analysis[] | null }) => {
       const list = data ?? []
+      const resolved = list.filter(a => a.status === 'green' || a.status === 'red')
+      const greenCount = list.filter(a => a.status === 'green').length
       setItems(list)
       setStats({
         total: list.length,
         hot: list.filter(a => a.is_hot).length,
-        green: list.filter(a => a.status === 'green').length,
+        green: greenCount,
         pending: list.filter(a => a.status === 'pending').length,
+        greenRate: resolved.length > 0 ? Math.round((greenCount / resolved.length) * 100) : 0,
       })
     })
   }, [sport])
@@ -67,90 +76,129 @@ function HomePage() {
       .select('*')
       .order('published_at', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(3)
+      .limit(4)
       .then(({ data }: { data: NewsItem[] | null }) => setNewsPreview(data ?? []))
   }, [])
 
-  const hot = (items ?? []).filter((a) => a.is_hot).slice(0, 6)
-  const rest = (items ?? []).filter((a) => !a.is_hot)
+  const filteredItems = useMemo(() => {
+    if (!items) return null
+    if (!searchQuery.trim()) return items
+    const q = searchQuery.toLowerCase()
+    return items.filter(a =>
+      a.title.toLowerCase().includes(q) ||
+      (a.championship?.toLowerCase() ?? '').includes(q) ||
+      (a.description?.toLowerCase() ?? '').includes(q) ||
+      (a.bookmaker_name?.toLowerCase() ?? '').includes(q)
+    )
+  }, [items, searchQuery])
+
+  const hot = (filteredItems ?? []).filter((a) => a.is_hot).slice(0, 8)
+  const rest = (filteredItems ?? []).filter((a) => !a.is_hot)
 
   const firstName = profile?.name?.split(' ')[0] ?? 'Membro'
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
 
   return (
     <AppShell>
       {/* ═══════════════════════════════════════════════════════════════
-          WELCOME VIP — Header personalizado com nome, país, badge
+          HERO VIP — Header cinematográfico com gradiente
           ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-6 pt-1">
+      <section className="mb-8 -mx-4 px-4 pt-2 pb-6 relative overflow-hidden">
+        {/* Background gradient orbs */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-arena-green/8 blur-3xl" />
+          <div className="absolute top-10 -left-20 w-60 h-60 rounded-full bg-arena-gold/5 blur-3xl" />
+        </div>
+
         <motion.div
-          initial={{ opacity: 0, y: -12 }}
+          initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          className="relative z-10"
         >
-          {/* Linha superior: saudação + badge VIP */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2.5">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: 'spring', stiffness: 300 }}
-                className="w-10 h-10 rounded-xl bg-gradient-to-br from-arena-green/20 to-arena-green/5 border border-arena-green/30 flex items-center justify-center"
+          {/* Top row: greeting + VIP badge */}
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="text-[11px] font-medium tracking-wider uppercase text-arena-text-secondary/50 mb-1"
               >
-                <Crown className="w-5 h-5 text-arena-green" strokeWidth={1.5} />
-              </motion.div>
-              <div>
-                <p className="text-[11px] font-medium tracking-wider uppercase text-arena-text-secondary/60">
-                  Bem-vindo de volta
-                </p>
-                <h1 className="text-lg font-bold text-white tracking-tight">
-                  {firstName}
-                </h1>
+                {greeting}
+              </motion.p>
+              <div className="flex items-center gap-2.5">
+                <motion.div
+                  initial={{ scale: 0, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.3, type: 'spring', stiffness: 260, damping: 20 }}
+                  className="w-11 h-11 rounded-2xl bg-gradient-to-br from-arena-green/25 to-arena-green/5 border border-arena-green/30 flex items-center justify-center shadow-lg shadow-arena-green/10"
+                >
+                  <Crown className="w-5 h-5 text-arena-green" strokeWidth={1.5} />
+                </motion.div>
+                <div>
+                  <h1 className="text-xl font-black text-white tracking-tight leading-none">
+                    {firstName}
+                  </h1>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-lg leading-none">{userCountry.flag}</span>
+                    <span className="text-[10px] text-arena-text-secondary/50 font-medium">
+                      {userCountry.name}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Badge VIP */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.4 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-arena-green/20 to-arena-green/5 border border-arena-green/30"
-              >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, x: 20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              transition={{ delay: 0.5, type: 'spring', stiffness: 300 }}
+              className="flex flex-col items-end gap-1.5"
+            >
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-arena-green/20 to-arena-green/5 border border-arena-green/30 shadow-sm shadow-arena-green/10">
                 <Sparkles className="w-3.5 h-3.5 text-arena-green" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-arena-green">
                   VIP Ativo
                 </span>
-              </motion.div>
-
-              {/* País */}
-              <div className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-arena-gray/30 border border-arena-gray/30">
-                <span className="text-sm">{userCountry.flag}</span>
-                <span className="text-[10px] font-medium text-arena-text-secondary/70 hidden sm:inline">
-                  {userCountry.name}
-                </span>
               </div>
-            </div>
+              {stats.greenRate > 0 && (
+                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-arena-gold/10 border border-arena-gold/20">
+                  <TrendingUp className="w-3 h-3 text-arena-gold" />
+                  <span className="text-[10px] font-bold text-arena-gold">
+                    {stats.greenRate}% Assertividade
+                  </span>
+                </div>
+              )}
+            </motion.div>
           </div>
 
-          {/* Subtítulo elegante */}
-          <p className="text-xs text-arena-text-secondary/50 font-medium leading-relaxed max-w-md">
+          {/* Motivational subtitle */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-xs text-arena-text-secondary/40 font-medium leading-relaxed max-w-sm"
+          >
             Acesso exclusivo às análises mais precisas do mercado. 
-            Fique à frente da concorrência.
-          </p>
+            Fique à frente da concorrência com dados em tempo real.
+          </motion.p>
         </motion.div>
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
           STATS RÁPIDAS — Cards glassmorphism com métricas
           ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-6">
-        <div className="grid grid-cols-4 gap-2">
+      <section className="mb-7">
+        <div className="grid grid-cols-4 gap-2.5">
           <StatCard
             icon={Target}
             value={stats.total}
             label="Análises"
             color="#00C853"
             delay={0.1}
+            suffix=""
           />
           <StatCard
             icon={Flame}
@@ -158,6 +206,7 @@ function HomePage() {
             label="Hot"
             color="#FFD700"
             delay={0.2}
+            suffix=""
           />
           <StatCard
             icon={TrendingUp}
@@ -165,13 +214,15 @@ function HomePage() {
             label="Green"
             color="#00C853"
             delay={0.3}
+            suffix=""
           />
           <StatCard
-            icon={Clock}
-            value={stats.pending}
-            label="Pendentes"
+            icon={Percent}
+            value={stats.greenRate}
+            label="Assertividade"
             color="#A0A0A0"
             delay={0.4}
+            suffix="%"
           />
         </div>
       </section>
@@ -179,7 +230,7 @@ function HomePage() {
       {/* ═══════════════════════════════════════════════════════════════
           JOGOS DE HOJE — Seção premium com scroll horizontal
           ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-6">
+      <section className="mb-7">
         <SectionHeader
           icon={Trophy}
           title="Jogos de Hoje"
@@ -189,7 +240,7 @@ function HomePage() {
         />
 
         {fixturesLoading && (
-          <div className="-mx-4 px-4 overflow-x-auto scrollbar-thin">
+          <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
             <div className="flex gap-3 w-max pb-2">
               <MatchCardSkeleton />
               <MatchCardSkeleton />
@@ -208,14 +259,14 @@ function HomePage() {
         )}
 
         {!fixturesLoading && !fixturesError && fixtures.length > 0 && (
-          <div className="-mx-4 px-4 overflow-x-auto scrollbar-thin">
+          <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
             <div className="flex gap-3 w-max pb-2">
               {fixtures.slice(0, 5).map((fixture, i) => (
                 <motion.div
                   key={fixture.fixture.id}
-                  initial={{ opacity: 0, x: 20 }}
+                  initial={{ opacity: 0, x: 24 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.08, duration: 0.4 }}
+                  transition={{ delay: i * 0.08, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                 >
                   <MatchCard
                     fixture={fixture}
@@ -240,10 +291,31 @@ function HomePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SPORT FILTER — Chips premium com ícones coloridos
+          SPORT FILTER + SEARCH — Chips premium com ícones coloridos
           ═══════════════════════════════════════════════════════════════ */}
       <section className="mb-6">
-        <div className="-mx-4 px-4 overflow-x-auto scrollbar-thin">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-arena-text-secondary/30" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar análise, time, campeonato..."
+              className="w-full h-10 pl-9 pr-4 rounded-xl bg-arena-dark/60 border border-arena-gray/25 text-xs text-white placeholder:text-arena-text-secondary/30 focus:outline-none focus:border-arena-green/40 focus:ring-1 focus:ring-arena-green/20 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-arena-text-secondary/30 hover:text-white transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
           <div className="flex gap-2 w-max">
             {SPORTS.map((s, i) => {
               const Icon = s.icon
@@ -253,14 +325,14 @@ function HomePage() {
                   key={s.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03, duration: 0.3 }}
+                  transition={{ delay: i * 0.03, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                   onClick={() => setSport(s.id)}
                   className={`
                     flex items-center gap-2 px-4 h-10 rounded-xl text-[12px] font-semibold
-                    border transition-all duration-300 whitespace-nowrap
+                    border transition-all duration-300 whitespace-nowrap select-none
                     ${active
                       ? 'bg-arena-green text-black border-arena-green shadow-lg shadow-arena-green/20'
-                      : 'bg-arena-dark/60 text-arena-text-secondary/70 border-arena-gray/30 hover:border-arena-gray/60 hover:text-white'
+                      : 'bg-arena-dark/60 text-arena-text-secondary/70 border-arena-gray/25 hover:border-arena-gray/50 hover:text-white'
                     }
                   `}
                 >
@@ -278,15 +350,16 @@ function HomePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          ANÁLISES QUENTES — Carousel premium
+          ANÁLISES QUENTES — Carousel premium cinematográfico
           ═══════════════════════════════════════════════════════════════ */}
       <AnimatePresence mode="wait">
-        {hot.length > 0 && (
+        {hot.length > 0 && !searchQuery && (
           <motion.section
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mb-6"
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="mb-7"
           >
             <SectionHeader
               icon={Flame}
@@ -294,14 +367,14 @@ function HomePage() {
               subtitle="Maior Confiança do Dia"
               accentColor="#FFD700"
             />
-            <div className="-mx-4 px-4 overflow-x-auto scrollbar-thin">
-              <div className="flex gap-3 w-max pb-2">
+            <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
+              <div className="flex gap-3.5 w-max pb-3">
                 {hot.map((a, i) => (
                   <motion.div
                     key={a.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.06, duration: 0.4 }}
+                    initial={{ opacity: 0, scale: 0.92, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ delay: i * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   >
                     <HotCard a={a} />
                   </motion.div>
@@ -313,40 +386,55 @@ function HomePage() {
       </AnimatePresence>
 
       {/* ═══════════════════════════════════════════════════════════════
-          ANÁLISES DO DIA — Grid premium
+          ANÁLISES DO DIA — Grid premium com todas as infos
           ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-6">
+      <section className="mb-8">
         <SectionHeader
           icon={BarChart3}
-          title="Análises do Dia"
-          subtitle="Todas as Oportunidades"
+          title={searchQuery ? 'Resultados da Busca' : 'Análises do Dia'}
+          subtitle={searchQuery ? `${filteredItems?.length ?? 0} encontradas` : 'Todas as Oportunidades'}
           accentColor="#00C853"
         />
 
         {items === null && (
           <div className="grid gap-3 md:grid-cols-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-36 rounded-2xl bg-arena-gray/20" />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-40 rounded-2xl bg-arena-gray/15" />
             ))}
           </div>
         )}
 
-        {items && rest.length === 0 && hot.length === 0 && (
+        {items && filteredItems && filteredItems.length === 0 && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-12 text-arena-text-secondary/40"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-14 text-arena-text-secondary/30"
           >
-            <Target className="w-10 h-10 mx-auto mb-3 opacity-30" strokeWidth={1.5} />
-            <p className="text-sm font-medium">Nenhuma análise disponível ainda.</p>
-            <p className="text-xs mt-1 opacity-60">Volte em breve para novas oportunidades.</p>
+            <Search className="w-10 h-10 mx-auto mb-3 opacity-20" strokeWidth={1.5} />
+            <p className="text-sm font-medium">
+              {searchQuery ? 'Nenhuma análise encontrada para esta busca.' : 'Nenhuma análise disponível ainda.'}
+            </p>
+            <p className="text-xs mt-1 opacity-50">
+              {searchQuery ? 'Tente outro termo ou limpe a busca.' : 'Volte em breve para novas oportunidades.'}
+            </p>
           </motion.div>
         )}
 
-        <div className="grid gap-3 md:grid-cols-2">
-          {rest.map((a, i) => (
-            <AnalysisCard key={a.id} a={a} index={i} />
-          ))}
+        <div className="grid gap-3.5 md:grid-cols-2">
+          <AnimatePresence mode="popLayout">
+            {rest.map((a, i) => (
+              <motion.div
+                key={a.id}
+                layout
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <AnalysisCard a={a} index={i} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       </section>
 
@@ -354,7 +442,7 @@ function HomePage() {
           NOTÍCIAS PREVIEW — Cards compactos na home
           ═══════════════════════════════════════════════════════════════ */}
       {newsPreview && newsPreview.length > 0 && (
-        <section className="mb-8">
+        <section className="mb-10">
           <SectionHeader
             icon={Newspaper}
             title="Últimas Notícias"
@@ -366,9 +454,9 @@ function HomePage() {
             {newsPreview.map((n, i) => (
               <motion.div
                 key={n.id}
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
+                transition={{ delay: i * 0.1, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               >
                 <Link
                   to="/news/$id"
@@ -459,27 +547,31 @@ function StatCard({
   label,
   color,
   delay,
+  suffix = '',
 }: {
   icon: React.ElementType
   value: number
   label: string
   color: string
   delay: number
+  suffix?: string
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-xl bg-arena-dark/40 border border-arena-gray/20 p-3"
+      transition={{ delay, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      className="relative overflow-hidden rounded-xl bg-arena-dark/50 border border-arena-gray/20 p-3 backdrop-blur-sm"
     >
       <div
-        className="absolute top-0 right-0 w-12 h-12 rounded-full blur-2xl opacity-20"
+        className="absolute -top-3 -right-3 w-14 h-14 rounded-full blur-2xl opacity-15"
         style={{ backgroundColor: color }}
       />
-      <Icon className="w-4 h-4 mb-2" style={{ color }} strokeWidth={1.5} />
-      <p className="text-xl font-black text-white tracking-tight">{value}</p>
-      <p className="text-[9px] text-arena-text-secondary/50 font-medium uppercase tracking-wider mt-0.5">
+      <Icon className="w-4 h-4 mb-2 relative z-10" style={{ color }} strokeWidth={1.5} />
+      <p className="text-xl font-black text-white tracking-tight relative z-10">
+        {value}{suffix}
+      </p>
+      <p className="text-[9px] text-arena-text-secondary/50 font-medium uppercase tracking-wider mt-0.5 relative z-10">
         {label}
       </p>
     </motion.div>
@@ -490,62 +582,124 @@ function sportMeta(id: string) {
   return SPORTS.find((s) => s.id === id) ?? SPORTS[0]
 }
 
+function bookmakerMeta(name: string | null | undefined) {
+  if (!name) return null
+  return BOOKMAKERS.find(b => b.name.toLowerCase() === name.toLowerCase()) ?? null
+}
+
+function formatBetType(bet: AnalysisBet | null | undefined): { label: string; color: string; icon: LucideIcon } | null {
+  if (!bet) return null
+  if (bet.bet_type === 'multipla') {
+    return { label: 'Múltipla', color: '#FF6B35', icon: Ticket }
+  }
+  return { label: 'Simples', color: '#00C853', icon: Target }
+}
+
+function formatMatchDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const now = new Date()
+  const isToday = d.toDateString() === now.toDateString()
+  const isTomorrow = new Date(now.getTime() + 86400000).toDateString() === d.toDateString()
+
+  if (isToday) return `Hoje, ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+  if (isTomorrow) return `Amanhã, ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
 /* ═══════════════════════════════════════════════════════════════
    HOT CARD — Design premium com overlay cinematográfico
    ═══════════════════════════════════════════════════════════════ */
 function HotCard({ a }: { a: Analysis }) {
   const meta = sportMeta(a.sport_type)
+  const bm = bookmakerMeta(a.bookmaker_name)
+  const betInfo = formatBetType(a.bet)
+  const selectionCount = a.bet?.selections?.length ?? a.matches?.length ?? 0
+
   return (
     <Link
       to="/analysis/$id"
       params={{ id: a.id }}
-      className="block w-[78vw] max-w-[340px] shrink-0"
+      className="block w-[82vw] max-w-[360px] shrink-0"
     >
       <motion.div
-        whileHover={{ y: -5, scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
+        whileHover={{ y: -6, scale: 1.01 }}
+        whileTap={{ scale: 0.97 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-        className="relative h-44 rounded-2xl overflow-hidden border border-arena-gray/30 bg-arena-dark group cursor-pointer"
+        className="relative h-48 rounded-2xl overflow-hidden border border-arena-gray/30 bg-arena-dark group cursor-pointer shadow-xl shadow-black/20"
       >
         {a.image_url ? (
           <img
             src={a.image_url}
             alt={a.title}
-            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
             loading="lazy"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-arena-green/8 via-arena-dark to-arena-gold/5" />
+          <div className="absolute inset-0 bg-gradient-to-br from-arena-green/10 via-arena-dark to-arena-gold/5" />
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/10" />
 
-        {/* Badge Hot */}
-        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-arena-gold text-black">
-          <Flame className="w-3 h-3" strokeWidth={2.5} />
-          <span className="text-[10px] font-black uppercase tracking-wider">Hot</span>
+        {/* Top badges */}
+        <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-10">
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-arena-gold text-black shadow-lg">
+              <Flame className="w-3 h-3" strokeWidth={2.5} />
+              <span className="text-[10px] font-black uppercase tracking-wider">Hot</span>
+            </div>
+            {betInfo && (
+              <div
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border"
+                style={{ backgroundColor: betInfo.color + '20', color: betInfo.color, borderColor: betInfo.color + '40' }}
+              >
+                <betInfo.icon className="w-3 h-3" />
+                {betInfo.label}
+                {selectionCount > 1 && ` (${selectionCount})`}
+              </div>
+            )}
+          </div>
+          <div className="px-2 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/10">
+            <span className="text-[10px] font-bold text-white/80 tracking-wider uppercase">
+              {meta.name}
+            </span>
+          </div>
         </div>
 
-        {/* Badge Sport */}
-        <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/8">
-          <span className="text-[10px] font-bold text-white/80 tracking-wider uppercase">
-            {meta.name}
-          </span>
-        </div>
-
-        {/* Conteúdo */}
-        <div className="absolute bottom-3 left-3 right-3">
-          <h3 className="font-bold text-white text-[15px] leading-snug line-clamp-2 mb-1.5">
+        {/* Bottom content */}
+        <div className="absolute bottom-3 left-3 right-3 z-10">
+          <h3 className="font-bold text-white text-[15px] leading-snug line-clamp-2 mb-2 drop-shadow-lg">
             {a.title}
           </h3>
-          {a.odds && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-arena-gold font-black text-base leading-none">
-                @{a.odds.toFixed(2)}
-              </span>
-              <span className="text-[10px] text-white/40 font-medium">odds</span>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {a.odds && (
+                <div className="flex items-baseline gap-1">
+                  <span className="text-arena-gold font-black text-lg leading-none">
+                    @{a.odds.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-white/40 font-medium">odds</span>
+                </div>
+              )}
+              {a.stake_value && (
+                <div className="flex items-baseline gap-1">
+                  <span className="text-white/60 font-bold text-sm leading-none">
+                    R$ {a.stake_value.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-white/30 font-medium">stake</span>
+                </div>
+              )}
             </div>
-          )}
+            {bm && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                style={{ backgroundColor: bm.color + '25', color: bm.color }}
+              >
+                {bm.name}
+              </span>
+            )}
+          </div>
         </div>
       </motion.div>
     </Link>
@@ -553,47 +707,80 @@ function HotCard({ a }: { a: Analysis }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   ANALYSIS CARD — Design clean com estados visuais refinados
+   ANALYSIS CARD — Design VIP com todas as informações
    ═══════════════════════════════════════════════════════════════ */
 function AnalysisCard({ a, index }: { a: Analysis; index: number }) {
   const meta = sportMeta(a.sport_type)
   const Icon = meta.icon
+  const bm = bookmakerMeta(a.bookmaker_name)
+  const betInfo = formatBetType(a.bet)
+  const selectionCount = a.bet?.selections?.length ?? a.matches?.length ?? 0
 
   const statusConfig = {
-    green: { bg: 'bg-arena-success/12', text: 'text-arena-success', label: 'GREEN', border: 'border-arena-success/15', dot: '#00C853' },
-    red: { bg: 'bg-arena-red/12', text: 'text-arena-red', label: 'RED', border: 'border-arena-red/15', dot: '#EF4444' },
-    pending: { bg: 'bg-arena-text-secondary/8', text: 'text-arena-text-secondary/60', label: 'PENDENTE', border: 'border-arena-gray/25', dot: '#A0A0A0' },
+    green: {
+      bg: 'bg-arena-success/12',
+      text: 'text-arena-success',
+      label: 'GREEN',
+      border: 'border-arena-success/20',
+      dot: '#00C853',
+      glow: 'shadow-arena-success/10',
+    },
+    red: {
+      bg: 'bg-arena-red/12',
+      text: 'text-arena-red',
+      label: 'RED',
+      border: 'border-arena-red/20',
+      dot: '#EF4444',
+      glow: 'shadow-arena-red/10',
+    },
+    pending: {
+      bg: 'bg-arena-text-secondary/8',
+      text: 'text-arena-text-secondary/60',
+      label: 'PENDENTE',
+      border: 'border-arena-gray/25',
+      dot: '#A0A0A0',
+      glow: '',
+    },
   }
 
   const status = a.status && statusConfig[a.status as keyof typeof statusConfig]
     ? statusConfig[a.status as keyof typeof statusConfig]
     : statusConfig.pending
 
+  const isResolved = a.status === 'green' || a.status === 'red'
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04, duration: 0.4, ease: 'easeOut' }}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
     >
       <Link
         to="/analysis/$id"
         params={{ id: a.id }}
         className="block rounded-2xl border border-arena-gray/25 bg-arena-dark/60 hover:border-arena-green/30 hover:shadow-lg hover:shadow-arena-green/5 transition-all duration-300 overflow-hidden group"
       >
+        {/* Image banner (if image type) */}
         {a.image_url && a.display_type === 'image' && (
-          <div className="aspect-[16/9] bg-arena-gray/15 overflow-hidden">
+          <div className="aspect-[21/9] bg-arena-gray/15 overflow-hidden relative">
             <img
               src={a.image_url}
               alt={a.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-600"
               loading="lazy"
             />
+            <div className="absolute inset-0 bg-gradient-to-t from-arena-dark/80 to-transparent" />
+            {isResolved && (
+              <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${a.status === 'green' ? 'bg-arena-success/90 text-black' : 'bg-arena-red/90 text-white'}`}>
+                {a.status === 'green' ? '✓ GREEN' : '✗ RED'}
+              </div>
+            )}
           </div>
         )}
 
         <div className="p-3.5">
-          {/* Tags */}
-          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+          {/* Top row: sport + badges */}
+          <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-arena-gray/25 text-[10px] font-bold uppercase tracking-wider text-white/70">
               <Icon className="w-3 h-3" style={{ color: meta.color }} />
               {meta.name}
@@ -606,36 +793,108 @@ function AnalysisCard({ a, index }: { a: Analysis; index: number }) {
               </span>
             )}
 
+            {betInfo && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border"
+                style={{ backgroundColor: betInfo.color + '12', color: betInfo.color, borderColor: betInfo.color + '25' }}
+              >
+                <betInfo.icon className="w-3 h-3" />
+                {betInfo.label}
+                {selectionCount > 0 && ` • ${selectionCount} sel.`}
+              </span>
+            )}
+
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold ${status.bg} ${status.text} border ${status.border}`}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: status.dot }} />
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: status.dot }} />
               {status.label}
             </span>
           </div>
 
-          {/* Título */}
-          <h3 className="font-bold text-white text-[15px] leading-snug line-clamp-2 group-hover:text-arena-green/90 transition-colors duration-300">
+          {/* Title */}
+          <h3 className="font-bold text-white text-[15px] leading-snug line-clamp-2 group-hover:text-arena-green/90 transition-colors duration-300 mb-1.5">
             {a.title}
           </h3>
 
-          {a.championship && (
-            <p className="text-[11px] text-arena-text-secondary/40 mt-1 font-medium">
-              {a.championship}
-            </p>
+          {/* Championship + Date */}
+          <div className="flex items-center gap-2 mb-3">
+            {a.championship && (
+              <p className="text-[11px] text-arena-text-secondary/40 font-medium truncate">
+                <Trophy className="w-3 h-3 inline mr-1 -mt-0.5" />
+                {a.championship}
+              </p>
+            )}
+            {a.match_date && (
+              <p className="text-[10px] text-arena-text-secondary/30 font-medium">
+                <Clock className="w-3 h-3 inline mr-1 -mt-0.5" />
+                {formatMatchDate(a.match_date)}
+              </p>
+            )}
+          </div>
+
+          {/* Bet preview (if structured) */}
+          {a.display_type === 'structured' && selectionCount > 0 && (
+            <div className="mb-3 p-2.5 rounded-xl bg-arena-dark/80 border border-arena-gray/15">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] text-arena-text-secondary/40 font-medium uppercase tracking-wider">
+                  {a.bet?.bet_type === 'multipla' ? 'Múltipla' : 'Simples'}
+                </span>
+                {bm && (
+                  <span
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                    style={{ backgroundColor: bm.color + '18', color: bm.color }}
+                  >
+                    {bm.name}
+                  </span>
+                )}
+              </div>
+              {/* Show first selection or match */}
+              {a.bet?.selections && a.bet.selections[0] ? (
+                <p className="text-xs text-white/80 font-medium truncate">
+                  {a.bet.selections[0].home_team} <span className="text-arena-text-secondary/30 mx-0.5">vs</span> {a.bet.selections[0].away_team}
+                </p>
+              ) : a.matches && a.matches[0] ? (
+                <p className="text-xs text-white/80 font-medium truncate">
+                  {a.matches[0].home_team} <span className="text-arena-text-secondary/30 mx-0.5">vs</span> {a.matches[0].away_team}
+                </p>
+              ) : null}
+              {selectionCount > 1 && (
+                <p className="text-[10px] text-arena-text-secondary/30 mt-0.5">
+                  +{selectionCount - 1} {selectionCount - 1 === 1 ? 'seleção' : 'seleções'}
+                </p>
+              )}
+            </div>
           )}
 
-          {/* Footer */}
-          <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-arena-gray/15">
-            {a.odds ? (
-              <div className="flex items-baseline gap-1">
-                <span className="text-arena-gold font-black text-sm">
-                  @{a.odds.toFixed(2)}
+          {/* Footer: values + arrow */}
+          <div className="flex items-center justify-between pt-2.5 border-t border-arena-gray/15">
+            <div className="flex items-center gap-3">
+              {a.odds ? (
+                <div className="flex items-baseline gap-1">
+                  <span className="text-arena-gold font-black text-sm">
+                    @{a.odds.toFixed(2)}
+                  </span>
+                  <span className="text-[9px] text-arena-text-secondary/30 font-medium">odds</span>
+                </div>
+              ) : (
+                <span />
+              )}
+              {a.stake_value ? (
+                <div className="flex items-baseline gap-1">
+                  <span className="text-white/60 font-bold text-sm">
+                    R$ {a.stake_value.toFixed(2)}
+                  </span>
+                  <span className="text-[9px] text-arena-text-secondary/30 font-medium">stake</span>
+                </div>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-1.5">
+              {isResolved && (
+                <span className={`text-[10px] font-black uppercase ${a.status === 'green' ? 'text-arena-success' : 'text-arena-red'}`}>
+                  {a.status === 'green' ? '✓ GREEN' : '✗ RED'}
                 </span>
-                <span className="text-[9px] text-arena-text-secondary/30 font-medium">odds</span>
-              </div>
-            ) : (
-              <span />
-            )}
-            <ChevronRight className="w-4 h-4 text-arena-text-secondary/20 group-hover:text-arena-green/50 group-hover:translate-x-0.5 transition-all duration-300" />
+              )}
+              <ChevronRight className="w-4 h-4 text-arena-text-secondary/20 group-hover:text-arena-green/50 group-hover:translate-x-0.5 transition-all duration-300" />
+            </div>
           </div>
         </div>
       </Link>

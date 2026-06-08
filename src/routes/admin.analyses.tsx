@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { AdminPageHeader } from './admin';
 import { supabase } from '@/integrations/supabase/client';
 import type { Analysis } from '@/types';
-import { Plus, Pencil, Trash2, Flame, Star, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Flame, Star, CheckCircle, XCircle, Loader2, Ticket, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
@@ -56,7 +56,6 @@ function AnalysesAdmin() {
     load();
   };
 
-  // ✅ CORRIGIDO: useLocation é hook, não Route.useLocation
   const location = useLocation();
   const pathname = location.pathname;
   const isChildRoute = pathname.includes('/new') || pathname.includes('/edit');
@@ -87,6 +86,20 @@ function AnalysesAdmin() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       <span className="px-1.5 py-0.5 rounded bg-arena-gray text-[9px] font-bold uppercase">{a.sport_type}</span>
+
+                      {/* Badge de tipo: Imagem ou Estruturada */}
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                        a.display_type === 'structured' 
+                          ? 'bg-arena-green/20 text-arena-green border border-arena-green/30' 
+                          : 'bg-arena-gold/20 text-arena-gold border border-arena-gold/30'
+                      }`}>
+                        {a.display_type === 'structured' ? (
+                          <span className="flex items-center gap-0.5"><Ticket className="w-2.5 h-2.5" /> Estruturada</span>
+                        ) : (
+                          <span className="flex items-center gap-0.5"><ExternalLink className="w-2.5 h-2.5" /> Imagem</span>
+                        )}
+                      </span>
+
                       {a.is_hot && <Flame className="w-3 h-3 text-arena-gold" />}
                       {a.is_featured && <Star className="w-3 h-3 text-arena-gold" />}
                       {a.status === 'green' && (

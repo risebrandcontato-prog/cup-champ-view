@@ -38,6 +38,22 @@ export const NEWS_CATEGORIES = [
   'Geral',
 ];
 
+export interface BookmakerOption {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export const BOOKMAKERS: BookmakerOption[] = [
+  { id: 'bet365', name: 'Bet365', color: '#007B5F' },
+  { id: 'betano', name: 'Betano', color: '#FF6600' },
+  { id: 'superbet', name: 'Superbet', color: '#00A651' },
+  { id: 'sportingbet', name: 'Sportingbet', color: '#E41B13' },
+  { id: 'kto', name: 'KTO', color: '#FF6B00' },
+  { id: 'blaze', name: 'Blaze', color: '#FF3333' },
+  { id: 'estrelabet', name: 'EstrelaBet', color: '#FFD700' },
+];
+
 export interface CountryOption { flag: string; name: string; }
 export const COUNTRIES: CountryOption[] = [
   { flag: '🇧🇷', name: 'Brasil' },{ flag: '🇦🇷', name: 'Argentina' },{ flag: '🇩🇪', name: 'Alemanha' },

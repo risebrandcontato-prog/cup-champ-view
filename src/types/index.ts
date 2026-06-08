@@ -34,6 +34,7 @@ export interface Analysis {
   resolved_at: string | null;
   matches?: AnalysisMatch[];
   user_bet?: UserBet | null;
+  bet?: AnalysisBet | null;
 }
 
 export interface AnalysisMatch {
@@ -45,6 +46,35 @@ export interface AnalysisMatch {
   bet_type: string;
   odds: number | null;
   match_time: string | null;
+}
+
+export interface AnalysisBet {
+  id: string;
+  analysis_id: string;
+  bookmaker_name: string;
+  bookmaker_url: string;
+  bet_type: 'simples' | 'multipla';
+  stake_value: number | null;
+  total_odds: number | null;
+  notes: string | null;
+  status: 'active' | 'expired' | 'won' | 'lost';
+  created_at: string;
+  updated_at: string;
+  selections?: AnalysisBetSelection[];
+}
+
+export interface AnalysisBetSelection {
+  id: string;
+  bet_id: string;
+  home_team: string;
+  away_team: string;
+  league: string | null;
+  match_time: string | null;
+  market: string;
+  selection: string;
+  odds: number | null;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface UserBet {
@@ -112,10 +142,10 @@ export interface NewsItem {
   image_url: string | null;
   category: string;
   is_featured: boolean;
-  is_auto: boolean | null;        // ← NOVO
-  source_name: string | null;     // ← NOVO
-  source_url: string | null;     // ← NOVO
-  published_at: string | null;   // ← NOVO
+  is_auto: boolean | null;
+  source_name: string | null;
+  source_url: string | null;
+  published_at: string | null;
   created_by: string | null;
   created_at: string;
 }
