@@ -10,12 +10,13 @@ import {
   Clock, Trophy, TrendingUp, Target, Copy, CheckCircle2, Ticket,
   Hash, ChevronRight, ShieldCheck, AlertCircle, Zap, Share2,
   AlertTriangle, HeartHandshake, Wallet, TrendingDown, Percent,
-  BarChart3, Users, Activity, type LucideIcon
+  BarChart3, Users, Activity, Lock, Crown, Timer, type LucideIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppShell } from '@/components/layout/AppShell';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
+import { useAccess } from '@/hooks/use-access';
 import { useFixtureData } from '@/hooks/use-fixture-data';
 import { FixtureDataPanel } from '@/components/FixtureDataPanel';
 import type { Analysis, AnalysisMatch, UserBet, AnalysisBet, AnalysisBetSelection } from '@/types';
@@ -33,6 +34,9 @@ function AnalysisDetail() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const access = useAccess();
+
+  // ─── TODOS OS HOOKS PRIMEIRO — sem returns condicionais antes deles ───
   const [analysis, setAnalysis] = useState<(Analysis & { matches: AnalysisMatch[]; bet: (AnalysisBet & { selections: AnalysisBetSelection[] }) | null }) | null>(null);
   const [bet, setBet] = useState<UserBet | null>(null);
   const [registering, setRegistering] = useState(false);
@@ -41,7 +45,12 @@ function AnalysisDetail() {
 
   const { data: fixtureData, loading: fixtureLoading, error: fixtureError } = useFixtureData(analysis?.fixture_id ?? null);
 
+  // Carrega análise apenas quando tem acesso confirmado
   useEffect(() => {
+    // Aguarda resolução do access antes de carregar dados
+    if (access.loading) return;
+    if (!access.hasAccess && !access.isTrial) return;
+
     let cancelled = false;
 
     (async () => {
@@ -57,12 +66,12 @@ function AnalysisDetail() {
         return;
       }
 
-      const bet = betData ? (betData as AnalysisBet & { selections: AnalysisBetSelection[] }) : null;
+      const betParsed = betData ? (betData as AnalysisBet & { selections: AnalysisBetSelection[] }) : null;
 
       setAnalysis({
         ...(analysisData as Analysis),
         matches: (matchesData as AnalysisMatch[]) ?? [],
-        bet,
+        bet: betParsed,
       });
 
       if (user) {
@@ -77,7 +86,7 @@ function AnalysisDetail() {
     })();
 
     return () => { cancelled = true; };
-  }, [id, user]);
+  }, [id, user, access.loading, access.hasAccess, access.isTrial]);
 
   const registerBet = async (didBet: boolean) => {
     if (!user || !analysis) return;
@@ -128,6 +137,30 @@ function AnalysisDetail() {
     }
   }, [analysis, copyToClipboard]);
 
+  // ─── BLOQUEIO DE ACESSO — Após TODOS os hooks ───
+  // Enquanto carrega: mostra loading genérico
+  if (access.loading) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center pt-24 gap-3">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+          >
+            <Loader2 className="w-8 h-8 text-arena-green" />
+          </motion.div>
+          <p className="text-sm text-arena-text-secondary/50 font-medium">Verificando acesso...</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // Acesso negado — só exibido quando loading === false
+  if (!access.hasAccess && !access.isTrial) {
+    return <AccessDeniedScreen access={access} />;
+  }
+
+  // ─── LOADING STATE (só aparece se tem acesso) ───
   if (!analysis) {
     return (
       <AppShell>
@@ -157,7 +190,27 @@ function AnalysisDetail() {
 
   return (
     <AppShell>
-      <div className="relative min-h-[calc(100vh-80px)] pb-32">
+      {/* ═══════════════════════════════════════════════════════════════
+          🔔 BANNER DE TRIAL — Quando faltam ≤ 2 dias
+          ═══════════════════════════════════════════════════════════════ */}
+      {access.isTrial && access.daysRemaining <= 2 && access.daysRemaining > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 300 }}
+          className="fixed top-0 left-0 right-0 z-50 bg-linear-to-r from-arena-gold/20 via-arena-gold/10 to-arena-gold/20 border-b border-arena-gold/30 backdrop-blur-xl"
+        >
+          <div className="max-w-2xl mx-auto px-4 py-2.5 flex items-center justify-center gap-2">
+            <Timer className="w-4 h-4 text-arena-gold animate-pulse" />
+            <p className="text-xs font-bold text-arena-gold">
+              Seu trial expira em <span className="text-white">{access.daysRemaining}</span> {access.daysRemaining === 1 ? 'dia' : 'dias'}.{' '}
+              <button className="ml-2 underline hover:text-white transition-colors">Assine agora</button>
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      <div className={`relative min-h-[calc(100vh-80px)] pb-32 ${access.isTrial && access.daysRemaining <= 2 ? 'pt-10' : ''}`}>
         {/* ═══════════════════════════════════════════════════════════════
             HERO HEADER — Cinematográfico com parallax e glow
             ═══════════════════════════════════════════════════════════════ */}
@@ -174,10 +227,10 @@ function AnalysisDetail() {
                   alt=""
                   className="absolute inset-0 w-full h-full object-cover blur-md opacity-25"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-arena-dark/40 via-arena-dark/80 to-arena-dark" />
+                <div className="absolute inset-0 bg-linear-to-b from-arena-dark/40 via-arena-dark/80 to-arena-dark" />
               </>
             ) : (
-              <div className="absolute inset-0 bg-gradient-to-b from-arena-green/8 via-arena-dark to-arena-dark" />
+              <div className="absolute inset-0 bg-linear-to-b from-arena-green/8 via-arena-dark to-arena-dark" />
             )}
             {/* Animated glow orbs */}
             <div className="absolute -top-10 -right-20 w-64 h-64 rounded-full bg-arena-green/10 blur-3xl animate-pulse" />
@@ -362,13 +415,13 @@ function AnalysisDetail() {
                 transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
                 className={`rounded-2xl border p-6 text-center relative overflow-hidden ${
                   isGreen
-                    ? 'border-arena-success/30 bg-gradient-to-b from-arena-success/15 via-arena-success/5 to-transparent'
-                    : 'border-arena-red/30 bg-gradient-to-b from-arena-red/15 via-arena-red/5 to-transparent'
+                    ? 'border-arena-success/30 bg-linear-to-b from-arena-success/15 via-arena-success/5 to-transparent'
+                    : 'border-arena-red/30 bg-linear-to-b from-arena-red/15 via-arena-red/5 to-transparent'
                 }`}
               >
                 {/* Glow effect */}
                 <div className={`absolute -top-10 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full blur-3xl ${isGreen ? 'bg-arena-success/20' : 'bg-arena-red/20'}`} />
-                
+
                 <motion.div
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
@@ -385,7 +438,7 @@ function AnalysisDetail() {
                     </div>
                   )}
                 </motion.div>
-                
+
                 <motion.p
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -394,7 +447,7 @@ function AnalysisDetail() {
                 >
                   {isGreen ? 'GREEN!' : 'RED'}
                 </motion.p>
-                
+
                 {analysis.resolved_at && (
                   <motion.p
                     initial={{ opacity: 0 }}
@@ -577,7 +630,7 @@ function AnalysisDetail() {
                 <Button
                   disabled={registering}
                   onClick={() => registerBet(true)}
-                  className="h-13 bg-gradient-to-r from-arena-green to-arena-green-dark text-black font-bold rounded-xl shadow-lg shadow-arena-green/20 transition-all active:scale-95 hover:shadow-arena-green/30 text-sm"
+                  className="h-13 bg-linear-to-r from-arena-green to-arena-green-dark text-black font-bold rounded-xl shadow-lg shadow-arena-green/20 transition-all active:scale-95 hover:shadow-arena-green/30 text-sm"
                 >
                   {registering ? (
                     <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
@@ -609,6 +662,171 @@ function AnalysisDetail() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   🚫 ACCESS DENIED SCREEN — Tela cinematográfica de bloqueio
+   ═══════════════════════════════════════════════════════════════ */
+function AccessDeniedScreen({ access }: { access: ReturnType<typeof useAccess> }) {
+  const navigate = useNavigate();
+
+  const config = useMemo(() => {
+    switch (access.level) {
+      case 'expired':
+        return {
+          icon: Timer,
+          title: 'Acesso Expirado',
+          subtitle: 'Seu período de teste ou assinatura chegou ao fim.',
+          color: '#EF4444',
+          bgGradient: 'from-arena-red/10 via-arena-dark to-arena-dark',
+          cta: 'Renovar Acesso',
+          ctaColor: 'bg-arena-gold text-black hover:bg-arena-gold/90',
+        };
+      case 'blocked':
+        return {
+          icon: Lock,
+          title: 'Conta Bloqueada',
+          subtitle: 'Sua conta foi suspensa. Entre em contato com o suporte.',
+          color: '#EF4444',
+          bgGradient: 'from-arena-red/10 via-arena-dark to-arena-dark',
+          cta: 'Falar com Suporte',
+          ctaColor: 'bg-arena-gold text-black hover:bg-arena-gold/90',
+        };
+      case 'free':
+      default:
+        return {
+          icon: Crown,
+          title: 'Acesso VIP Necessário',
+          subtitle: 'Assine agora para desbloquear todas as análises exclusivas.',
+          color: '#FFD700',
+          bgGradient: 'from-arena-gold/10 via-arena-dark to-arena-dark',
+          cta: 'Assinar Agora',
+          ctaColor: 'bg-arena-gold text-black hover:bg-arena-gold/90',
+        };
+    }
+  }, [access.level]);
+
+  const Icon = config.icon;
+
+  return (
+    <AppShell>
+      <div className="relative min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 -mx-4 overflow-hidden">
+        {/* Background effects */}
+        <div className="absolute inset-0 bg-linear-to-b from-arena-dark via-arena-dark to-arena-dark/95" />
+        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full blur-3xl opacity-20" style={{ backgroundColor: config.color }} />
+        <div className="absolute top-1/3 -left-20 w-48 h-48 rounded-full bg-arena-green/5 blur-3xl" />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          className="relative z-10 text-center max-w-sm w-full"
+        >
+          {/* Icon */}
+          <motion.div
+            initial={{ scale: 0, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
+            className="w-20 h-20 rounded-3xl bg-linear-to-br border flex items-center justify-center mx-auto mb-6 shadow-2xl"
+            style={{
+              backgroundColor: `${config.color}15`,
+              borderColor: `${config.color}30`,
+              boxShadow: `0 0 40px ${config.color}15`
+            }}
+          >
+            <Icon className="w-10 h-10" style={{ color: config.color }} strokeWidth={1.5} />
+          </motion.div>
+
+          {/* Title */}
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-3xl font-black tracking-tight text-white mb-3"
+          >
+            {config.title}
+          </motion.h1>
+
+          {/* Subtitle */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-sm text-arena-text-secondary/50 mb-8 leading-relaxed"
+          >
+            {config.subtitle}
+          </motion.p>
+
+          {/* Access info card */}
+          {access.expiresAt && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="rounded-2xl border border-arena-gray/20 bg-arena-dark/60 p-4 mb-6 backdrop-blur-sm"
+            >
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-arena-text-secondary/40" />
+                <span className="text-xs text-arena-text-secondary/40 font-medium">Expirou em</span>
+              </div>
+              <p className="text-lg font-bold text-arena-red">
+                {access.expiresAt.toLocaleDateString('pt-BR', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            </motion.div>
+          )}
+
+          {/* CTA Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <button
+              className={`w-full h-14 rounded-2xl font-black text-sm shadow-xl transition-all active:scale-[0.98] ${config.ctaColor}`}
+              style={{ boxShadow: `0 8px 32px ${config.color}20` }}
+            >
+              {config.cta}
+            </button>
+          </motion.div>
+
+          {/* Back to home */}
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            onClick={() => navigate({ to: '/' })}
+            className="mt-4 text-xs text-arena-text-secondary/30 hover:text-white transition-colors font-medium"
+          >
+            ← Voltar para a Home
+          </motion.button>
+
+          {/* Decorative elements */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-8 flex items-center justify-center gap-4"
+          >
+            <div className="flex items-center gap-1.5 text-[10px] text-arena-text-secondary/20">
+              <ShieldCheck className="w-3 h-3" />
+              <span>Pagamento Seguro</span>
+            </div>
+            <div className="w-1 h-1 rounded-full bg-arena-text-secondary/10" />
+            <div className="flex items-center gap-1.5 text-[10px] text-arena-text-secondary/20">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Acesso Imediato</span>
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
+    </AppShell>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    RESPONSIBLE GAMBLING BANNER — Componente reutilizável
    ═══════════════════════════════════════════════════════════════ */
 function ResponsibleGamblingBanner({ compact = false }: { compact?: boolean }) {
@@ -618,7 +836,7 @@ function ResponsibleGamblingBanner({ compact = false }: { compact?: boolean }) {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="rounded-xl border border-arena-gold/15 bg-gradient-to-r from-arena-gold/5 to-transparent p-3 flex items-center gap-2.5"
+        className="rounded-xl border border-arena-gold/15 bg-linear-to-r from-arena-gold/5 to-transparent p-3 flex items-center gap-2.5"
       >
         <div className="w-7 h-7 rounded-lg bg-arena-gold/10 border border-arena-gold/20 flex items-center justify-center shrink-0">
           <HeartHandshake className="w-3.5 h-3.5 text-arena-gold" />
@@ -635,10 +853,10 @@ function ResponsibleGamblingBanner({ compact = false }: { compact?: boolean }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="rounded-2xl border border-arena-gold/15 bg-gradient-to-br from-arena-gold/5 via-arena-dark/50 to-arena-gold/5 p-5 relative overflow-hidden"
+      className="rounded-2xl border border-arena-gold/15 bg-linear-to-br from-arena-gold/5 via-arena-dark/50 to-arena-gold/5 p-5 relative overflow-hidden"
     >
       <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-arena-gold/8 blur-3xl" />
-      
+
       <div className="relative z-10">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-8 h-8 rounded-lg bg-arena-gold/10 border border-arena-gold/20 flex items-center justify-center">
@@ -717,7 +935,7 @@ function QuickStatsBar({
           {stake ? `R$ ${stake.toFixed(2)}` : '—'}
         </p>
       </div>
-      
+
       <div className="rounded-2xl border border-arena-gray/20 bg-arena-dark/50 p-4 text-center relative overflow-hidden">
         <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-arena-green/5 blur-2xl" />
         <p className="text-[9px] uppercase tracking-wider text-arena-text-secondary/40 font-bold mb-1.5 relative z-10">Odds</p>
@@ -725,7 +943,7 @@ function QuickStatsBar({
           {odds ? `@${odds.toFixed(2)}` : '—'}
         </p>
       </div>
-      
+
       <div className={`rounded-2xl border p-4 text-center relative overflow-hidden ${
         isResolved
           ? isGreen
@@ -788,13 +1006,13 @@ function BetTicketCard({
       className="rounded-2xl border border-arena-gray/20 bg-arena-dark/60 overflow-hidden backdrop-blur-sm shadow-2xl shadow-black/15 relative"
     >
       {/* Decorative top line */}
-      <div className="h-1 bg-gradient-to-r from-arena-green via-arena-gold to-arena-green" />
+      <div className="h-1 bg-linear-to-r from-arena-green via-arena-gold to-arena-green" />
 
       {/* Ticket Header */}
       <div className="p-5 border-b border-arena-gray/15">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-arena-green/20 to-arena-green/5 border border-arena-green/25 flex items-center justify-center shadow-lg shadow-arena-green/10">
+            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-arena-green/20 to-arena-green/5 border border-arena-green/25 flex items-center justify-center shadow-lg shadow-arena-green/10">
               <Ticket className="w-5 h-5 text-arena-green" />
             </div>
             <div>
@@ -807,10 +1025,10 @@ function BetTicketCard({
           {bookmaker && (
             <span
               className="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider border"
-              style={{ 
-                backgroundColor: `${bookmaker.color}15`, 
-                color: bookmaker.color, 
-                borderColor: `${bookmaker.color}30` 
+              style={{
+                backgroundColor: `${bookmaker.color}15`,
+                color: bookmaker.color,
+                borderColor: `${bookmaker.color}30`
               }}
             >
               {bookmaker.name}
@@ -825,7 +1043,7 @@ function BetTicketCard({
               href={bet.bookmaker_url}
               target="_blank"
               rel="noreferrer"
-              className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-arena-green/15 to-arena-green/5 border border-arena-green/20 text-arena-green text-xs font-bold hover:from-arena-green/25 hover:to-arena-green/10 transition-all truncate"
+              className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-r from-arena-green/15 to-arena-green/5 border border-arena-green/20 text-arena-green text-xs font-bold hover:from-arena-green/25 hover:to-arena-green/10 transition-all truncate"
             >
               <ExternalLink className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">Abrir na {bookmaker?.name ?? 'casa de aposta'}</span>
@@ -854,8 +1072,8 @@ function BetTicketCard({
               className="relative pl-4"
             >
               {/* Connector line */}
-              <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-gradient-to-b from-arena-green/40 via-arena-green/20 to-transparent rounded-full" />
-              
+              <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-linear-to-b from-arena-green/40 via-arena-green/20 to-transparent rounded-full" />
+
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -940,7 +1158,7 @@ function BetTicketCard({
             href={bet.bookmaker_url}
             target="_blank"
             rel="noreferrer"
-            className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-gradient-to-r from-arena-green to-arena-green-dark text-black font-bold text-sm hover:shadow-xl hover:shadow-arena-green/25 transition-all active:scale-[0.98] shadow-lg shadow-arena-green/15"
+            className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-linear-to-r from-arena-green to-arena-green-dark text-black font-bold text-sm hover:shadow-xl hover:shadow-arena-green/25 transition-all active:scale-[0.98] shadow-lg shadow-arena-green/15"
           >
             <Share2 className="w-4 h-4" />
             Replicar Aposta na {bookmaker?.name ?? 'Casa'}

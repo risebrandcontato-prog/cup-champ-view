@@ -1,3 +1,4 @@
+// src/types/index.ts
 export interface Profile {
   id: string;
   name: string | null;
@@ -7,6 +8,13 @@ export interface Profile {
   favorite_national_team: string | null;
   role: 'admin' | 'user';
   onboarding_completed: boolean;
+  // ─── Controle de Acesso ───
+  access_type?: 'trial' | 'weekly' | 'monthly' | 'yearly' | 'lifetime' | 'free' | 'blocked';
+  access_days?: number;
+  access_started_at?: string;
+  access_expires_at?: string;
+  is_active?: boolean;
+  // ─── Fim Controle de Acesso ───
   created_at: string;
   updated_at: string;
 }
@@ -156,4 +164,12 @@ export interface SupportConfig {
   whatsapp_link: string | null;
   support_text: string;
   is_active: boolean;
+}
+
+// ─── App Settings (Controle Global) ───
+export interface AppSetting {
+  id: string;
+  key: string;
+  value: string;
+  updated_at: string;
 }

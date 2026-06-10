@@ -8,13 +8,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Flame, Star, TrendingUp, Calendar, Trophy, Zap, ChevronRight,
   Crown, Sparkles, Activity, BarChart3, ArrowUpRight, Globe,
-  ShieldCheck, Clock, Newspaper, Target, Percent, Ticket,
+  ShieldCheck, Clock, CheckCircle2, Newspaper, Target, Percent, Ticket,
   ChevronLeft, X, Filter, Search, Hash, Award, Footprints,
-  AlertTriangle, HeartHandshake, Wallet, History,
+  AlertTriangle, HeartHandshake, Wallet, History, Timer, Lock,
   type LucideIcon
 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { useAuth, db } from '@/hooks/use-auth'
+import { useAccess } from '@/hooks/use-access'
 import { SPORTS, COUNTRIES, BOOKMAKERS } from '@/lib/constants'
 import type { Analysis, NewsItem, AnalysisBet } from '@/types'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,6 +29,7 @@ export const Route = createFileRoute('/')({
    ═══════════════════════════════════════════════════════════════ */
 function HomePage() {
   const { profile } = useAuth()
+  const access = useAccess()
   const [items, setItems] = useState<Analysis[] | null>(null)
   const [newsPreview, setNewsPreview] = useState<NewsItem[] | null>(null)
   const [stats, setStats] = useState({ total: 0, hot: 0, green: 0, pending: 0, greenRate: 0 })
@@ -84,430 +86,621 @@ function HomePage() {
   // Avatar do usuário (profile.avatar_url ou fallback)
   const avatarUrl = profile?.avatar_url ?? null
 
+  // ─── BLOQUEIO DE ACESSO — Se expirou/bloqueado, mostra tela de bloqueio ───
+  if (!access.hasAccess && !access.isTrial) {
+    return <HomeAccessDenied access={access} />
+  }
+
   return (
     <AppShell>
       {/* ═══════════════════════════════════════════════════════════════
-          HERO VIP — Header cinematográfico com gradiente
+          🔔 BANNER DE TRIAL — Quando faltam ≤ 2 dias
           ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-8 -mx-4 px-4 pt-2 pb-6 relative overflow-hidden">
-        {/* Background gradient orbs */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-arena-green/8 blur-3xl" />
-          <div className="absolute top-10 -left-20 w-60 h-60 rounded-full bg-arena-gold/5 blur-3xl" />
-        </div>
-
+      {access.isTrial && access.daysRemaining <= 2 && access.daysRemaining > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="relative z-10"
+          initial={{ opacity: 0, y: -20, height: 0 }}
+          animate={{ opacity: 1, y: 0, height: 'auto' }}
+          className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-arena-gold/20 via-arena-gold/10 to-arena-gold/20 border-b border-arena-gold/30 backdrop-blur-xl"
         >
-          {/* Top row: greeting + VIP badge */}
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="text-[11px] font-medium tracking-wider uppercase text-arena-text-secondary/50 mb-1"
-              >
-                {greeting}
-              </motion.p>
-              <div className="flex items-center gap-2.5">
-                {/* 🆕 AVATAR REDONDO — puxa foto do perfil */}
-                <motion.div
-                  initial={{ scale: 0, rotate: -20 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 0.3, type: 'spring', stiffness: 260, damping: 20 }}
-                  className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-arena-green/30 shadow-lg shadow-arena-green/10 shrink-0"
+          <div className="max-w-2xl mx-auto px-4 py-2.5 flex items-center justify-center gap-2">
+            <Timer className="w-4 h-4 text-arena-gold animate-pulse" />
+            <p className="text-xs font-bold text-arena-gold">
+              Seu trial expira em <span className="text-white">{access.daysRemaining}</span> {access.daysRemaining === 1 ? 'dia' : 'dias'}. 
+              <Link to="/support" className="ml-2 underline hover:text-white transition-colors">Assine agora</Link>
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      <div className={access.isTrial && access.daysRemaining <= 2 ? 'pt-10' : ''}>
+        {/* ═══════════════════════════════════════════════════════════════
+            HERO VIP — Header cinematográfico com gradiente
+            ═══════════════════════════════════════════════════════════════ */}
+        <section className="mb-8 -mx-4 px-4 pt-2 pb-6 relative overflow-hidden">
+          {/* Background gradient orbs */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-arena-green/8 blur-3xl" />
+            <div className="absolute top-10 -left-20 w-60 h-60 rounded-full bg-arena-gold/5 blur-3xl" />
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            className="relative z-10"
+          >
+            {/* Top row: greeting + VIP badge */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-[11px] font-medium tracking-wider uppercase text-arena-text-secondary/50 mb-1"
                 >
-                  {avatarUrl ? (
-                    <img
-                      src={avatarUrl}
-                      alt={firstName}
-                      className="w-full h-full object-cover"
-                      loading="eager"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-arena-green/25 to-arena-green/5 flex items-center justify-center">
-                      <span className="text-lg font-black text-arena-green">
-                        {firstName.charAt(0).toUpperCase()}
+                  {greeting}
+                </motion.p>
+                <div className="flex items-center gap-2.5">
+                  {/* 🆕 AVATAR REDONDO — puxa foto do perfil */}
+                  <motion.div
+                    initial={{ scale: 0, rotate: -20 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ delay: 0.3, type: 'spring', stiffness: 260, damping: 20 }}
+                    className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-arena-green/30 shadow-lg shadow-arena-green/10 shrink-0"
+                  >
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt={firstName}
+                        className="w-full h-full object-cover"
+                        loading="eager"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-arena-green/25 to-arena-green/5 flex items-center justify-center">
+                        <span className="text-lg font-black text-arena-green">
+                          {firstName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    {/* Online indicator */}
+                    <div className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-arena-green border-2 border-arena-dark" />
+                  </motion.div>
+                  <div>
+                    <h1 className="text-xl font-black text-white tracking-tight leading-none">
+                      {firstName}
+                    </h1>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-lg leading-none">{userCountry.flag}</span>
+                      <span className="text-[10px] text-arena-text-secondary/50 font-medium">
+                        {userCountry.name}
                       </span>
                     </div>
-                  )}
-                  {/* Online indicator */}
-                  <div className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-arena-green border-2 border-arena-dark" />
-                </motion.div>
-                <div>
-                  <h1 className="text-xl font-black text-white tracking-tight leading-none">
-                    {firstName}
-                  </h1>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="text-lg leading-none">{userCountry.flag}</span>
-                    <span className="text-[10px] text-arena-text-secondary/50 font-medium">
-                      {userCountry.name}
-                    </span>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, x: 20 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              transition={{ delay: 0.5, type: 'spring', stiffness: 300 }}
-              className="flex flex-col items-end gap-1.5"
-            >
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-arena-green/20 to-arena-green/5 border border-arena-green/30 shadow-sm shadow-arena-green/10">
-                <Sparkles className="w-3.5 h-3.5 text-arena-green" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-arena-green">
-                  VIP Ativo
-                </span>
-              </div>
-              {stats.greenRate > 0 && (
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-arena-gold/10 border border-arena-gold/20">
-                  <TrendingUp className="w-3 h-3 text-arena-gold" />
-                  <span className="text-[10px] font-bold text-arena-gold">
-                    {stats.greenRate}% Assertividade
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8, x: 20 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                transition={{ delay: 0.5, type: 'spring', stiffness: 300 }}
+                className="flex flex-col items-end gap-1.5"
+              >
+                {/* 🆕 BADGE VIP DINÂMICO — Mostra tipo de acesso + dias */}
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border shadow-sm ${
+                  access.isTrial 
+                    ? 'bg-gradient-to-r from-arena-gold/20 to-arena-gold/5 border-arena-gold/30 shadow-arena-gold/10'
+                    : access.isLifetime
+                    ? 'bg-gradient-to-r from-arena-purple/20 to-arena-purple/5 border-arena-purple/30 shadow-arena-purple/10'
+                    : 'bg-gradient-to-r from-arena-green/20 to-arena-green/5 border-arena-green/30 shadow-arena-green/10'
+                }`}>
+                  {access.isTrial ? (
+                    <Timer className="w-3.5 h-3.5 text-arena-gold" />
+                  ) : access.isLifetime ? (
+                    <Crown className="w-3.5 h-3.5 text-arena-purple" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-arena-green" />
+                  )}
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${
+                    access.isTrial ? 'text-arena-gold' : access.isLifetime ? 'text-arena-purple' : 'text-arena-green'
+                  }`}>
+                    {access.isTrial ? `Trial • ${access.daysRemaining}d` : access.isLifetime ? 'Vitalício' : 'VIP Ativo'}
                   </span>
                 </div>
-              )}
-            </motion.div>
+
+                {stats.greenRate > 0 && (
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-arena-gold/10 border border-arena-gold/20">
+                    <TrendingUp className="w-3 h-3 text-arena-gold" />
+                    <span className="text-[10px] font-bold text-arena-gold">
+                      {stats.greenRate}% Assertividade
+                    </span>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+
+            {/* Motivational subtitle */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="text-xs text-arena-text-secondary/40 font-medium leading-relaxed max-w-sm"
+            >
+              Acesso exclusivo às análises mais precisas do mercado. 
+              Fique à frente da concorrência com dados em tempo real.
+            </motion.p>
+          </motion.div>
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            STATS RÁPIDAS — Cards glassmorphism com métricas
+            ═══════════════════════════════════════════════════════════════ */}
+        <section className="mb-7">
+          <div className="grid grid-cols-4 gap-2.5">
+            <StatCard
+              icon={Target}
+              value={stats.total}
+              label="Análises"
+              color="#00C853"
+              delay={0.1}
+              suffix=""
+            />
+            <StatCard
+              icon={Flame}
+              value={stats.hot}
+              label="Hot"
+              color="#FFD700"
+              delay={0.2}
+              suffix=""
+            />
+            <StatCard
+              icon={TrendingUp}
+              value={stats.green}
+              label="Green"
+              color="#00C853"
+              delay={0.3}
+              suffix=""
+            />
+            <StatCard
+              icon={Percent}
+              value={stats.greenRate}
+              label="Assertividade"
+              color="#A0A0A0"
+              delay={0.4}
+              suffix="%"
+            />
           </div>
+        </section>
 
-          {/* Motivational subtitle */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="text-xs text-arena-text-secondary/40 font-medium leading-relaxed max-w-sm"
-          >
-            Acesso exclusivo às análises mais precisas do mercado. 
-            Fique à frente da concorrência com dados em tempo real.
-          </motion.p>
-        </motion.div>
-      </section>
+        {/* ═══════════════════════════════════════════════════════════════
+            JOGO RESPONSÁVEL — Banner fixo de avisos (sempre visível)
+            ═══════════════════════════════════════════════════════════════ */}
+        <ResponsibleGamblingBanner />
 
-      {/* ═══════════════════════════════════════════════════════════════
-          STATS RÁPIDAS — Cards glassmorphism com métricas
-          ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-7">
-        <div className="grid grid-cols-4 gap-2.5">
-          <StatCard
-            icon={Target}
-            value={stats.total}
-            label="Análises"
-            color="#00C853"
-            delay={0.1}
-            suffix=""
-          />
-          <StatCard
-            icon={Flame}
-            value={stats.hot}
-            label="Hot"
-            color="#FFD700"
-            delay={0.2}
-            suffix=""
-          />
-          <StatCard
-            icon={TrendingUp}
-            value={stats.green}
-            label="Green"
-            color="#00C853"
-            delay={0.3}
-            suffix=""
-          />
-          <StatCard
-            icon={Percent}
-            value={stats.greenRate}
-            label="Assertividade"
-            color="#A0A0A0"
-            delay={0.4}
-            suffix="%"
-          />
-        </div>
-      </section>
+        {/* ═══════════════════════════════════════════════════════════════
+            AÇÕES RÁPIDAS — Links para histórico e outras seções
+            ═══════════════════════════════════════════════════════════════ */}
+        <section className="mb-6">
+          <div className="grid grid-cols-2 gap-2.5">
+            <Link
+              to="/results"
+              className="flex items-center gap-2.5 p-3 rounded-xl bg-arena-dark/50 border border-arena-gray/20 hover:border-arena-green/30 hover:bg-arena-dark/70 transition-all group"
+            >
+              <div className="w-9 h-9 rounded-lg bg-arena-green/10 border border-arena-green/20 flex items-center justify-center shrink-0">
+                <History className="w-4 h-4 text-arena-green" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white group-hover:text-arena-green transition-colors">Histórico</p>
+                <p className="text-[9px] text-arena-text-secondary/40">Análises finalizadas</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-arena-text-secondary/20 ml-auto shrink-0 group-hover:text-arena-green/50 group-hover:translate-x-0.5 transition-all" />
+            </Link>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          JOGO RESPONSÁVEL — Banner fixo de avisos (sempre visível)
-          ═══════════════════════════════════════════════════════════════ */}
-      <ResponsibleGamblingBanner />
+            <Link
+              to="/news"
+              className="flex items-center gap-2.5 p-3 rounded-xl bg-arena-dark/50 border border-arena-gray/20 hover:border-arena-gold/30 hover:bg-arena-dark/70 transition-all group"
+            >
+              <div className="w-9 h-9 rounded-lg bg-arena-gold/10 border border-arena-gold/20 flex items-center justify-center shrink-0">
+                <Newspaper className="w-4 h-4 text-arena-gold" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white group-hover:text-arena-gold transition-colors">Notícias</p>
+                <p className="text-[9px] text-arena-text-secondary/40">Últimas do mercado</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-arena-text-secondary/20 ml-auto shrink-0 group-hover:text-arena-gold/50 group-hover:translate-x-0.5 transition-all" />
+            </Link>
+          </div>
+        </section>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          AÇÕES RÁPIDAS — Links para histórico e outras seções
-          ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-6">
-        <div className="grid grid-cols-2 gap-2.5">
-          <Link
-            to="/results"
-            className="flex items-center gap-2.5 p-3 rounded-xl bg-arena-dark/50 border border-arena-gray/20 hover:border-arena-green/30 hover:bg-arena-dark/70 transition-all group"
-          >
-            <div className="w-9 h-9 rounded-lg bg-arena-green/10 border border-arena-green/20 flex items-center justify-center shrink-0">
-              <History className="w-4 h-4 text-arena-green" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-white group-hover:text-arena-green transition-colors">Histórico</p>
-              <p className="text-[9px] text-arena-text-secondary/40">Análises finalizadas</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-arena-text-secondary/20 ml-auto shrink-0 group-hover:text-arena-green/50 group-hover:translate-x-0.5 transition-all" />
-          </Link>
-
-          <Link
-            to="/news"
-            className="flex items-center gap-2.5 p-3 rounded-xl bg-arena-dark/50 border border-arena-gray/20 hover:border-arena-gold/30 hover:bg-arena-dark/70 transition-all group"
-          >
-            <div className="w-9 h-9 rounded-lg bg-arena-gold/10 border border-arena-gold/20 flex items-center justify-center shrink-0">
-              <Newspaper className="w-4 h-4 text-arena-gold" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-white group-hover:text-arena-gold transition-colors">Notícias</p>
-              <p className="text-[9px] text-arena-text-secondary/40">Últimas do mercado</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-arena-text-secondary/20 ml-auto shrink-0 group-hover:text-arena-gold/50 group-hover:translate-x-0.5 transition-all" />
-          </Link>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════
-          🆕 TÍTULO ANÁLISES DO DIA — Cinematográfico, sem filtros
-          ═══════════════════════════════════════════════════════════════ */}
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="mb-7 relative"
-      >
-        {/* Decorative background glow */}
-        <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 rounded-full bg-arena-green/5 blur-3xl pointer-events-none" />
-        
-        <div className="relative z-10 text-center py-6">
-          {/* Top accent line */}
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ delay: 0.5, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="w-16 h-0.5 bg-gradient-to-r from-transparent via-arena-green to-transparent mx-auto mb-5"
-          />
+        {/* ═══════════════════════════════════════════════════════════════
+            🆕 TÍTULO ANÁLISES DO DIA — Cinematográfico, sem filtros
+            ═══════════════════════════════════════════════════════════════ */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-7 relative"
+        >
+          {/* Decorative background glow */}
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 rounded-full bg-arena-green/5 blur-3xl pointer-events-none" />
           
+          <div className="relative z-10 text-center py-6">
+            {/* Top accent line */}
+            <motion.div
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ delay: 0.5, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="w-16 h-0.5 bg-gradient-to-r from-transparent via-arena-green to-transparent mx-auto mb-5"
+            />
+            
+            {/* Icon */}
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.4, type: 'spring', stiffness: 200, damping: 15 }}
+              className="w-12 h-12 rounded-2xl bg-gradient-to-br from-arena-green/20 to-arena-green/5 border border-arena-green/25 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-arena-green/10"
+            >
+              <BarChart3 className="w-6 h-6 text-arena-green" strokeWidth={1.5} />
+            </motion.div>
+            
+            {/* Title */}
+            <motion.h2
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+              className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-2"
+            >
+              ANÁLISES DO DIA
+            </motion.h2>
+            
+            {/* Subtitle */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="text-xs text-arena-text-secondary/40 font-medium tracking-wider uppercase"
+            >
+              Oportunidades Selecionadas pela Equipe
+            </motion.p>
+            
+            {/* Bottom accent line */}
+            <motion.div
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ delay: 0.7, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="w-24 h-0.5 bg-gradient-to-r from-transparent via-arena-green/50 to-transparent mx-auto mt-5"
+            />
+          </div>
+        </motion.section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ANÁLISES EM DESTAQUE — Scroll horizontal
+            ═══════════════════════════════════════════════════════════════ */}
+        <AnimatePresence mode="wait">
+          {featured.length > 0 && (
+            <motion.section
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="mb-7"
+            >
+              <SectionHeader
+                icon={Star}
+                title="Análises em Destaque"
+                subtitle="Selecionadas pela Equipe"
+                accentColor="#FFD700"
+              />
+              <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
+                <div className="flex gap-3.5 w-max pb-3">
+                  {featured.map((a, i) => (
+                    <motion.div
+                      key={a.id}
+                      initial={{ opacity: 0, scale: 0.92, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ delay: i * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                    >
+                      <FeaturedCard a={a} />
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ANÁLISES QUENTES — Carousel premium cinematográfico
+            ═══════════════════════════════════════════════════════════════ */}
+        <AnimatePresence mode="wait">
+          {hot.length > 0 && (
+            <motion.section
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="mb-7"
+            >
+              <SectionHeader
+                icon={Flame}
+                title="Análises Quentes"
+                subtitle="Maior Confiança do Dia"
+                accentColor="#FF6B35"
+              />
+              <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
+                <div className="flex gap-3.5 w-max pb-3">
+                  {hot.map((a, i) => (
+                    <motion.div
+                      key={a.id}
+                      initial={{ opacity: 0, scale: 0.92, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ delay: i * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                    >
+                      <HotCard a={a} />
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ANÁLISES DO DIA — Grid premium com todas as infos
+            ═══════════════════════════════════════════════════════════════ */}
+        <section className="mb-8">
+          <SectionHeader
+            icon={BarChart3}
+            title="Todas as Análises"
+            subtitle="Oportunidades Disponíveis"
+            accentColor="#00C853"
+          />
+
+          {items === null && (
+            <div className="grid gap-3 md:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-40 rounded-2xl bg-arena-gray/15" />
+              ))}
+            </div>
+          )}
+
+          {items && items.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-14 text-arena-text-secondary/30"
+            >
+              <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-20" strokeWidth={1.5} />
+              <p className="text-sm font-medium">
+                Nenhuma análise disponível ainda.
+              </p>
+              <p className="text-xs mt-1 opacity-50">
+                Volte em breve para novas oportunidades.
+              </p>
+            </motion.div>
+          )}
+
+          <div className="grid gap-3.5 md:grid-cols-2">
+            <AnimatePresence mode="popLayout">
+              {rest.map((a, i) => (
+                <motion.div
+                  key={a.id}
+                  layout
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <AnalysisCard a={a} index={i} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            NOTÍCIAS PREVIEW — Cards compactos na home
+            ═══════════════════════════════════════════════════════════════ */}
+        {newsPreview && newsPreview.length > 0 && (
+          <section className="mb-10">
+            <SectionHeader
+              icon={Newspaper}
+              title="Últimas Notícias"
+              subtitle="Fique por Dentro"
+              accentColor="#A0A0A0"
+              action={{ label: 'Ver todas', to: '/news' }}
+            />
+            <div className="space-y-2.5">
+              {newsPreview.map((n, i) => (
+                <motion.div
+                  key={n.id}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <Link
+                    to="/news/$id"
+                    params={{ id: n.id }}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-arena-dark/40 border border-arena-gray/20 hover:border-arena-green/30 hover:bg-arena-dark/60 transition-all duration-300 group"
+                  >
+                    {n.image_url ? (
+                      <img
+                        src={n.image_url}
+                        alt=""
+                        className="w-14 h-14 rounded-lg object-cover shrink-0"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-arena-green/10 to-arena-gold/5 flex items-center justify-center shrink-0">
+                        <Newspaper className="w-5 h-5 text-arena-green/40" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-white truncate group-hover:text-arena-green/90 transition-colors">
+                        {n.title}
+                      </p>
+                      <p className="text-[10px] text-arena-text-secondary/40 mt-0.5">
+                        {n.published_at
+                          ? new Date(n.published_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+                          : new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                      </p>
+                    </div>
+                    <ArrowUpRight className="w-4 h-4 text-arena-text-secondary/20 group-hover:text-arena-green/60 transition-colors shrink-0" />
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </AppShell>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🚫 HOME ACCESS DENIED — Tela quando acesso expirou na home
+   ═══════════════════════════════════════════════════════════════ */
+function HomeAccessDenied({ access }: { access: ReturnType<typeof useAccess> }) {
+  const config = useMemo(() => {
+    switch (access.level) {
+      case 'expired':
+        return {
+          icon: Timer,
+          title: 'Acesso Expirado',
+          subtitle: 'Seu período de teste ou assinatura chegou ao fim. Renove agora para continuar recebendo as melhores análises.',
+          color: '#EF4444',
+          cta: 'Renovar Acesso VIP',
+          ctaColor: 'bg-arena-gold text-black hover:bg-arena-gold/90',
+        }
+      case 'blocked':
+        return {
+          icon: Lock,
+          title: 'Conta Bloqueada',
+          subtitle: 'Sua conta foi suspensa pelo administrador. Entre em contato com o suporte para mais informações.',
+          color: '#EF4444',
+          cta: 'Falar com Suporte',
+          ctaColor: 'bg-arena-gold text-black hover:bg-arena-gold/90',
+        }
+      case 'free':
+      default:
+        return {
+          icon: Crown,
+          title: 'Acesso VIP Necessário',
+          subtitle: 'Assine agora para desbloquear todas as análises exclusivas, dicas premium e estatísticas em tempo real.',
+          color: '#FFD700',
+          cta: 'Assinar Agora',
+          ctaColor: 'bg-arena-gold text-black hover:bg-arena-gold/90',
+        }
+    }
+  }, [access.level])
+
+  const Icon = config.icon
+
+  return (
+    <AppShell>
+      <div className="relative min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 -mx-4 overflow-hidden">
+        {/* Background effects */}
+        <div className="absolute inset-0 bg-gradient-to-b from-arena-dark via-arena-dark to-arena-dark/95" />
+        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full blur-3xl opacity-20" style={{ backgroundColor: config.color }} />
+        <div className="absolute top-1/3 -left-20 w-48 h-48 rounded-full bg-arena-green/5 blur-3xl" />
+        
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          className="relative z-10 text-center max-w-sm w-full"
+        >
           {/* Icon */}
           <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.4, type: 'spring', stiffness: 200, damping: 15 }}
-            className="w-12 h-12 rounded-2xl bg-gradient-to-br from-arena-green/20 to-arena-green/5 border border-arena-green/25 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-arena-green/10"
+            initial={{ scale: 0, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
+            className="w-20 h-20 rounded-3xl bg-gradient-to-br border flex items-center justify-center mx-auto mb-6 shadow-2xl"
+            style={{ 
+              backgroundColor: `${config.color}15`,
+              borderColor: `${config.color}30`,
+              boxShadow: `0 0 40px ${config.color}15`
+            }}
           >
-            <BarChart3 className="w-6 h-6 text-arena-green" strokeWidth={1.5} />
+            <Icon className="w-10 h-10" style={{ color: config.color }} strokeWidth={1.5} />
           </motion.div>
-          
+
           {/* Title */}
-          <motion.h2
+          <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-            className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-2"
+            transition={{ delay: 0.3 }}
+            className="text-3xl font-black tracking-tight text-white mb-3"
           >
-            ANÁLISES DO DIA
-          </motion.h2>
-          
+            {config.title}
+          </motion.h1>
+
           {/* Subtitle */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="text-xs text-arena-text-secondary/40 font-medium tracking-wider uppercase"
+            transition={{ delay: 0.4 }}
+            className="text-sm text-arena-text-secondary/50 mb-8 leading-relaxed"
           >
-            Oportunidades Selecionadas pela Equipe
+            {config.subtitle}
           </motion.p>
-          
-          {/* Bottom accent line */}
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ delay: 0.7, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="w-24 h-0.5 bg-gradient-to-r from-transparent via-arena-green/50 to-transparent mx-auto mt-5"
-          />
-        </div>
-      </motion.section>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          ANÁLISES EM DESTAQUE — Scroll horizontal
-          ═══════════════════════════════════════════════════════════════ */}
-      <AnimatePresence mode="wait">
-        {featured.length > 0 && (
-          <motion.section
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="mb-7"
-          >
-            <SectionHeader
-              icon={Star}
-              title="Análises em Destaque"
-              subtitle="Selecionadas pela Equipe"
-              accentColor="#FFD700"
-            />
-            <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
-              <div className="flex gap-3.5 w-max pb-3">
-                {featured.map((a, i) => (
-                  <motion.div
-                    key={a.id}
-                    initial={{ opacity: 0, scale: 0.92, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ delay: i * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                  >
-                    <FeaturedCard a={a} />
-                  </motion.div>
-                ))}
+          {/* Access info card */}
+          {access.expiresAt && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="rounded-2xl border border-arena-gray/20 bg-arena-dark/60 p-4 mb-6 backdrop-blur-sm"
+            >
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-arena-text-secondary/40" />
+                <span className="text-xs text-arena-text-secondary/40 font-medium">Expirou em</span>
               </div>
-            </div>
-          </motion.section>
-        )}
-      </AnimatePresence>
+              <p className="text-lg font-bold text-arena-red">
+                {access.expiresAt.toLocaleDateString('pt-BR', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            </motion.div>
+          )}
 
-      {/* ═══════════════════════════════════════════════════════════════
-          ANÁLISES QUENTES — Carousel premium cinematográfico
-          ═══════════════════════════════════════════════════════════════ */}
-      <AnimatePresence mode="wait">
-        {hot.length > 0 && (
-          <motion.section
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="mb-7"
-          >
-            <SectionHeader
-              icon={Flame}
-              title="Análises Quentes"
-              subtitle="Maior Confiança do Dia"
-              accentColor="#FF6B35"
-            />
-            <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
-              <div className="flex gap-3.5 w-max pb-3">
-                {hot.map((a, i) => (
-                  <motion.div
-                    key={a.id}
-                    initial={{ opacity: 0, scale: 0.92, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ delay: i * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                  >
-                    <HotCard a={a} />
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.section>
-        )}
-      </AnimatePresence>
-
-      {/* ═══════════════════════════════════════════════════════════════
-          ANÁLISES DO DIA — Grid premium com todas as infos
-          ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-8">
-        <SectionHeader
-          icon={BarChart3}
-          title="Todas as Análises"
-          subtitle="Oportunidades Disponíveis"
-          accentColor="#00C853"
-        />
-
-        {items === null && (
-          <div className="grid gap-3 md:grid-cols-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-40 rounded-2xl bg-arena-gray/15" />
-            ))}
-          </div>
-        )}
-
-        {items && items.length === 0 && (
+          {/* CTA Button */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-14 text-arena-text-secondary/30"
+            transition={{ delay: 0.6 }}
           >
-            <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-20" strokeWidth={1.5} />
-            <p className="text-sm font-medium">
-              Nenhuma análise disponível ainda.
-            </p>
-            <p className="text-xs mt-1 opacity-50">
-              Volte em breve para novas oportunidades.
-            </p>
+            <button
+              className={`w-full h-14 rounded-2xl font-black text-sm shadow-xl transition-all active:scale-[0.98] ${config.ctaColor}`}
+              style={{ boxShadow: `0 8px 32px ${config.color}20` }}
+            >
+              {config.cta}
+            </button>
           </motion.div>
-        )}
 
-        <div className="grid gap-3.5 md:grid-cols-2">
-          <AnimatePresence mode="popLayout">
-            {rest.map((a, i) => (
-              <motion.div
-                key={a.id}
-                layout
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <AnalysisCard a={a} index={i} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════
-          NOTÍCIAS PREVIEW — Cards compactos na home
-          ═══════════════════════════════════════════════════════════════ */}
-      {newsPreview && newsPreview.length > 0 && (
-        <section className="mb-10">
-          <SectionHeader
-            icon={Newspaper}
-            title="Últimas Notícias"
-            subtitle="Fique por Dentro"
-            accentColor="#A0A0A0"
-            action={{ label: 'Ver todas', to: '/news' }}
-          />
-          <div className="space-y-2.5">
-            {newsPreview.map((n, i) => (
-              <motion.div
-                key={n.id}
-                initial={{ opacity: 0, x: -12 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <Link
-                  to="/news/$id"
-                  params={{ id: n.id }}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-arena-dark/40 border border-arena-gray/20 hover:border-arena-green/30 hover:bg-arena-dark/60 transition-all duration-300 group"
-                >
-                  {n.image_url ? (
-                    <img
-                      src={n.image_url}
-                      alt=""
-                      className="w-14 h-14 rounded-lg object-cover shrink-0"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-arena-green/10 to-arena-gold/5 flex items-center justify-center shrink-0">
-                      <Newspaper className="w-5 h-5 text-arena-green/40" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-white truncate group-hover:text-arena-green/90 transition-colors">
-                      {n.title}
-                    </p>
-                    <p className="text-[10px] text-arena-text-secondary/40 mt-0.5">
-                      {n.published_at
-                        ? new Date(n.published_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-                        : new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-                    </p>
-                  </div>
-                  <ArrowUpRight className="w-4 h-4 text-arena-text-secondary/20 group-hover:text-arena-green/60 transition-colors shrink-0" />
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-      )}
+          {/* Decorative elements */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-8 flex items-center justify-center gap-4"
+          >
+            <div className="flex items-center gap-1.5 text-[10px] text-arena-text-secondary/20">
+              <ShieldCheck className="w-3 h-3" />
+              <span>Pagamento Seguro</span>
+            </div>
+            <div className="w-1 h-1 rounded-full bg-arena-text-secondary/10" />
+            <div className="flex items-center gap-1.5 text-[10px] text-arena-text-secondary/20">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Acesso Imediato</span>
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
     </AppShell>
   )
 }
