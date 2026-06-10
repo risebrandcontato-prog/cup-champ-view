@@ -10,13 +10,12 @@ import {
   Crown, Sparkles, Activity, BarChart3, ArrowUpRight, Globe,
   ShieldCheck, Clock, Newspaper, Target, Percent, Ticket,
   ChevronLeft, X, Filter, Search, Hash, Award, Footprints,
+  AlertTriangle, HeartHandshake, Wallet, History,
   type LucideIcon
 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { useAuth, db } from '@/hooks/use-auth'
 import { SPORTS, COUNTRIES, BOOKMAKERS } from '@/lib/constants'
-import { useFixtures } from '@/hooks/use-fixtures'
-import { MatchCard, MatchCardSkeleton } from '@/components/match/MatchCard'
 import type { Analysis, NewsItem, AnalysisBet } from '@/types'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -28,14 +27,12 @@ export const Route = createFileRoute('/')({
    HOME VIP — Experiência premium completa
    ═══════════════════════════════════════════════════════════════ */
 function HomePage() {
-  const { profile, user } = useAuth()
+  const { profile } = useAuth()
   const [sport, setSport] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [items, setItems] = useState<Analysis[] | null>(null)
   const [newsPreview, setNewsPreview] = useState<NewsItem[] | null>(null)
   const [stats, setStats] = useState({ total: 0, hot: 0, green: 0, pending: 0, greenRate: 0 })
-
-  const { fixtures, loading: fixturesLoading, error: fixturesError } = useFixtures()
 
   // Detectar país do usuário (fallback Brasil)
   const userCountry = useMemo(() => {
@@ -93,7 +90,8 @@ function HomePage() {
   }, [items, searchQuery])
 
   const hot = (filteredItems ?? []).filter((a) => a.is_hot).slice(0, 8)
-  const rest = (filteredItems ?? []).filter((a) => !a.is_hot)
+  const featured = (filteredItems ?? []).filter((a) => a.is_featured && !a.is_hot).slice(0, 5)
+  const rest = (filteredItems ?? []).filter((a) => !a.is_hot && !a.is_featured)
 
   const firstName = profile?.name?.split(' ')[0] ?? 'Membro'
   const hour = new Date().getHours()
@@ -228,66 +226,43 @@ function HomePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          JOGOS DE HOJE — Seção premium com scroll horizontal
+          JOGO RESPONSÁVEL — Banner fixo de avisos (sempre visível)
           ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-7">
-        <SectionHeader
-          icon={Trophy}
-          title="Jogos de Hoje"
-          subtitle="Ao Vivo & Próximos"
-          action={{ label: 'Ver todos', to: '/fixtures' }}
-          accentColor="#00C853"
-        />
+      <ResponsibleGamblingBanner />
 
-        {fixturesLoading && (
-          <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
-            <div className="flex gap-3 w-max pb-2">
-              <MatchCardSkeleton />
-              <MatchCardSkeleton />
-              <MatchCardSkeleton />
+      {/* ═══════════════════════════════════════════════════════════════
+          AÇÕES RÁPIDAS — Links para histórico e outras seções
+          ═══════════════════════════════════════════════════════════════ */}
+      <section className="mb-6">
+        <div className="grid grid-cols-2 gap-2.5">
+          <Link
+            to="/results"
+            className="flex items-center gap-2.5 p-3 rounded-xl bg-arena-dark/50 border border-arena-gray/20 hover:border-arena-green/30 hover:bg-arena-dark/70 transition-all group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-arena-green/10 border border-arena-green/20 flex items-center justify-center shrink-0">
+              <History className="w-4 h-4 text-arena-green" />
             </div>
-          </div>
-        )}
-
-        {fixturesError && (
-          <div className="rounded-2xl border border-arena-gray/40 bg-arena-dark/60 p-5 text-center">
-            <Zap className="w-5 h-5 mx-auto mb-2 text-arena-text-secondary/30" />
-            <p className="text-sm text-arena-text-secondary/60">
-              Não foi possível carregar os jogos.
-            </p>
-          </div>
-        )}
-
-        {!fixturesLoading && !fixturesError && fixtures.length > 0 && (
-          <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
-            <div className="flex gap-3 w-max pb-2">
-              {fixtures.slice(0, 5).map((fixture, i) => (
-                <motion.div
-                  key={fixture.fixture.id}
-                  initial={{ opacity: 0, x: 24 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.08, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  <MatchCard
-                    fixture={fixture}
-                    onClick={() => {
-                      console.log('Clicked fixture:', fixture.fixture.id)
-                    }}
-                  />
-                </motion.div>
-              ))}
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white group-hover:text-arena-green transition-colors">Histórico</p>
+              <p className="text-[9px] text-arena-text-secondary/40">Análises finalizadas</p>
             </div>
-          </div>
-        )}
+            <ChevronRight className="w-4 h-4 text-arena-text-secondary/20 ml-auto shrink-0 group-hover:text-arena-green/50 group-hover:translate-x-0.5 transition-all" />
+          </Link>
 
-        {!fixturesLoading && !fixturesError && fixtures.length === 0 && (
-          <div className="rounded-2xl border border-arena-gray/40 bg-arena-dark/60 p-5 text-center">
-            <Calendar className="w-5 h-5 mx-auto mb-2 text-arena-text-secondary/30" />
-            <p className="text-sm text-arena-text-secondary/60">
-              Nenhum jogo programado para hoje.
-            </p>
-          </div>
-        )}
+          <Link
+            to="/news"
+            className="flex items-center gap-2.5 p-3 rounded-xl bg-arena-dark/50 border border-arena-gray/20 hover:border-arena-gold/30 hover:bg-arena-dark/70 transition-all group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-arena-gold/10 border border-arena-gold/20 flex items-center justify-center shrink-0">
+              <Newspaper className="w-4 h-4 text-arena-gold" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white group-hover:text-arena-gold transition-colors">Notícias</p>
+              <p className="text-[9px] text-arena-text-secondary/40">Últimas do mercado</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-arena-text-secondary/20 ml-auto shrink-0 group-hover:text-arena-gold/50 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+        </div>
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
@@ -350,6 +325,42 @@ function HomePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
+          ANÁLISES EM DESTAQUE — Scroll horizontal (substitui Jogos de Hoje)
+          ═══════════════════════════════════════════════════════════════ */}
+      <AnimatePresence mode="wait">
+        {featured.length > 0 && !searchQuery && (
+          <motion.section
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="mb-7"
+          >
+            <SectionHeader
+              icon={Star}
+              title="Análises em Destaque"
+              subtitle="Selecionadas pela Equipe"
+              accentColor="#FFD700"
+            />
+            <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
+              <div className="flex gap-3.5 w-max pb-3">
+                {featured.map((a, i) => (
+                  <motion.div
+                    key={a.id}
+                    initial={{ opacity: 0, scale: 0.92, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ delay: i * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    <FeaturedCard a={a} />
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════════════════════════════════════════════════════════════
           ANÁLISES QUENTES — Carousel premium cinematográfico
           ═══════════════════════════════════════════════════════════════ */}
       <AnimatePresence mode="wait">
@@ -365,7 +376,7 @@ function HomePage() {
               icon={Flame}
               title="Análises Quentes"
               subtitle="Maior Confiança do Dia"
-              accentColor="#FFD700"
+              accentColor="#FF6B35"
             />
             <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
               <div className="flex gap-3.5 w-max pb-3">
@@ -391,8 +402,8 @@ function HomePage() {
       <section className="mb-8">
         <SectionHeader
           icon={BarChart3}
-          title={searchQuery ? 'Resultados da Busca' : 'Análises do Dia'}
-          subtitle={searchQuery ? `${filteredItems?.length ?? 0} encontradas` : 'Todas as Oportunidades'}
+          title={searchQuery ? 'Resultados da Busca' : 'Todas as Análises'}
+          subtitle={searchQuery ? `${filteredItems?.length ?? 0} encontradas` : 'Oportunidades Disponíveis'}
           accentColor="#00C853"
         />
 
@@ -493,6 +504,71 @@ function HomePage() {
         </section>
       )}
     </AppShell>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BANNER JOGO RESPONSÁVEL — Avisos automáticos fixos
+   ═══════════════════════════════════════════════════════════════ */
+function ResponsibleGamblingBanner() {
+  const [dismissed, setDismissed] = useState(false)
+
+  if (dismissed) return null
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.6, duration: 0.5 }}
+      className="mb-6"
+    >
+      <div className="rounded-2xl border border-arena-gold/20 bg-gradient-to-r from-arena-gold/5 via-arena-dark/50 to-arena-gold/5 p-4 relative overflow-hidden">
+        {/* Decorative glow */}
+        <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-arena-gold/10 blur-2xl" />
+        
+        <div className="relative z-10">
+          <div className="flex items-start justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-arena-gold/15 border border-arena-gold/25 flex items-center justify-center">
+                <HeartHandshake className="w-3.5 h-3.5 text-arena-gold" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-arena-gold">Jogo Responsável</h3>
+                <p className="text-[9px] text-arena-text-secondary/40">Sua segurança é prioridade</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setDismissed(true)}
+              className="text-arena-text-secondary/20 hover:text-white transition-colors p-1"
+              aria-label="Fechar aviso"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-arena-dark/40 border border-arena-gray/15">
+              <AlertTriangle className="w-3.5 h-3.5 text-arena-gold/60 shrink-0" />
+              <span className="text-[10px] text-white/70 font-medium leading-tight">
+                Aposte com consciência
+              </span>
+            </div>
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-arena-dark/40 border border-arena-gray/15">
+              <Wallet className="w-3.5 h-3.5 text-arena-gold/60 shrink-0" />
+              <span className="text-[10px] text-white/70 font-medium leading-tight">
+                Siga a gestão de banca
+              </span>
+            </div>
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-arena-dark/40 border border-arena-gray/15">
+              <ShieldCheck className="w-3.5 h-3.5 text-arena-gold/60 shrink-0" />
+              <span className="text-[10px] text-white/70 font-medium leading-tight">
+                Nunca aposte o que não pode perder
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.section>
   )
 }
 
@@ -608,6 +684,111 @@ function formatMatchDate(dateStr: string | null | undefined): string {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   FEATURED CARD — Card de destaque (substitui MatchCard)
+   ═══════════════════════════════════════════════════════════════ */
+function FeaturedCard({ a }: { a: Analysis }) {
+  const meta = sportMeta(a.sport_type)
+  const bm = bookmakerMeta(a.bookmaker_name)
+  const betInfo = formatBetType(a.bet)
+  const selectionCount = a.bet?.selections?.length ?? a.matches?.length ?? 0
+  const isResolved = a.status === 'green' || a.status === 'red'
+
+  return (
+    <Link
+      to="/analysis/$id"
+      params={{ id: a.id }}
+      className="block w-[82vw] max-w-[360px] shrink-0"
+    >
+      <motion.div
+        whileHover={{ y: -6, scale: 1.01 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+        className="relative h-48 rounded-2xl overflow-hidden border border-arena-gold/20 bg-arena-dark group cursor-pointer shadow-xl shadow-black/20"
+      >
+        {a.image_url ? (
+          <img
+            src={a.image_url}
+            alt={a.title}
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-arena-gold/10 via-arena-dark to-arena-green/5" />
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/10" />
+
+        {/* Top badges */}
+        <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-10">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-arena-gold text-black shadow-lg">
+              <Star className="w-3 h-3" strokeWidth={2.5} />
+              <span className="text-[10px] font-black uppercase tracking-wider">Destaque</span>
+            </div>
+            {betInfo && (
+              <div
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border"
+                style={{ backgroundColor: betInfo.color + '20', color: betInfo.color, borderColor: betInfo.color + '40' }}
+              >
+                <betInfo.icon className="w-3 h-3" />
+                {betInfo.label}
+                {selectionCount > 1 && ` (${selectionCount})`}
+              </div>
+            )}
+            {isResolved && (
+              <div className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${a.status === 'green' ? 'bg-arena-success text-black' : 'bg-arena-red text-white'}`}>
+                {a.status === 'green' ? '✓ GREEN' : '✗ RED'}
+              </div>
+            )}
+          </div>
+          <div className="px-2 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/10">
+            <span className="text-[10px] font-bold text-white/80 tracking-wider uppercase">
+              {meta.name}
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom content */}
+        <div className="absolute bottom-3 left-3 right-3 z-10">
+          <h3 className="font-bold text-white text-[15px] leading-snug line-clamp-2 mb-2 drop-shadow-lg">
+            {a.title}
+          </h3>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {a.odds && (
+                <div className="flex items-baseline gap-1">
+                  <span className="text-arena-gold font-black text-lg leading-none">
+                    @{a.odds.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-white/40 font-medium">odds</span>
+                </div>
+              )}
+              {a.stake_value && (
+                <div className="flex items-baseline gap-1">
+                  <span className="text-white/60 font-bold text-sm leading-none">
+                    R$ {a.stake_value.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-white/30 font-medium">stake</span>
+                </div>
+              )}
+            </div>
+            {bm && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                style={{ backgroundColor: bm.color + '25', color: bm.color }}
+              >
+                {bm.name}
+              </span>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </Link>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
    HOT CARD — Design premium com overlay cinematográfico
    ═══════════════════════════════════════════════════════════════ */
 function HotCard({ a }: { a: Analysis }) {
@@ -615,6 +796,7 @@ function HotCard({ a }: { a: Analysis }) {
   const bm = bookmakerMeta(a.bookmaker_name)
   const betInfo = formatBetType(a.bet)
   const selectionCount = a.bet?.selections?.length ?? a.matches?.length ?? 0
+  const isResolved = a.status === 'green' || a.status === 'red'
 
   return (
     <Link
@@ -643,7 +825,7 @@ function HotCard({ a }: { a: Analysis }) {
 
         {/* Top badges */}
         <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-10">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-arena-gold text-black shadow-lg">
               <Flame className="w-3 h-3" strokeWidth={2.5} />
               <span className="text-[10px] font-black uppercase tracking-wider">Hot</span>
@@ -656,6 +838,11 @@ function HotCard({ a }: { a: Analysis }) {
                 <betInfo.icon className="w-3 h-3" />
                 {betInfo.label}
                 {selectionCount > 1 && ` (${selectionCount})`}
+              </div>
+            )}
+            {isResolved && (
+              <div className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${a.status === 'green' ? 'bg-arena-success text-black' : 'bg-arena-red text-white'}`}>
+                {a.status === 'green' ? '✓ GREEN' : '✗ RED'}
               </div>
             )}
           </div>
@@ -723,7 +910,6 @@ function AnalysisCard({ a, index }: { a: Analysis; index: number }) {
       label: 'GREEN',
       border: 'border-arena-success/20',
       dot: '#00C853',
-      glow: 'shadow-arena-success/10',
     },
     red: {
       bg: 'bg-arena-red/12',
@@ -731,7 +917,6 @@ function AnalysisCard({ a, index }: { a: Analysis; index: number }) {
       label: 'RED',
       border: 'border-arena-red/20',
       dot: '#EF4444',
-      glow: 'shadow-arena-red/10',
     },
     pending: {
       bg: 'bg-arena-text-secondary/8',
@@ -739,7 +924,6 @@ function AnalysisCard({ a, index }: { a: Analysis; index: number }) {
       label: 'PENDENTE',
       border: 'border-arena-gray/25',
       dot: '#A0A0A0',
-      glow: '',
     },
   }
 
@@ -760,8 +944,8 @@ function AnalysisCard({ a, index }: { a: Analysis; index: number }) {
         params={{ id: a.id }}
         className="block rounded-2xl border border-arena-gray/25 bg-arena-dark/60 hover:border-arena-green/30 hover:shadow-lg hover:shadow-arena-green/5 transition-all duration-300 overflow-hidden group"
       >
-        {/* Image banner (if image type) */}
-        {a.image_url && a.display_type === 'image' && (
+        {/* Image banner (if has image) */}
+        {a.image_url && (
           <div className="aspect-[21/9] bg-arena-gray/15 overflow-hidden relative">
             <img
               src={a.image_url}
@@ -816,7 +1000,7 @@ function AnalysisCard({ a, index }: { a: Analysis; index: number }) {
           </h3>
 
           {/* Championship + Date */}
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
             {a.championship && (
               <p className="text-[11px] text-arena-text-secondary/40 font-medium truncate">
                 <Trophy className="w-3 h-3 inline mr-1 -mt-0.5" />
@@ -847,7 +1031,6 @@ function AnalysisCard({ a, index }: { a: Analysis; index: number }) {
                   </span>
                 )}
               </div>
-              {/* Show first selection or match */}
               {a.bet?.selections && a.bet.selections[0] ? (
                 <p className="text-xs text-white/80 font-medium truncate">
                   {a.bet.selections[0].home_team} <span className="text-arena-text-secondary/30 mx-0.5">vs</span> {a.bet.selections[0].away_team}

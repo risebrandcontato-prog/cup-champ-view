@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SupportRouteImport } from './routes/support'
+import { Route as ResultsRouteImport } from './routes/results'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as LoginRouteImport } from './routes/login'
@@ -33,6 +34,11 @@ import { Route as AdminAnalysesIdEditRouteImport } from './routes/admin.analyses
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResultsRoute = ResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/news': typeof NewsRouteWithChildren
   '/profile': typeof ProfileRoute
+  '/results': typeof ResultsRoute
   '/support': typeof SupportRoute
   '/admin/analyses': typeof AdminAnalysesRouteWithChildren
   '/admin/bonuses': typeof AdminBonusesRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/news': typeof NewsRouteWithChildren
   '/profile': typeof ProfileRoute
+  '/results': typeof ResultsRoute
   '/support': typeof SupportRoute
   '/admin/analyses': typeof AdminAnalysesRouteWithChildren
   '/admin/bonuses': typeof AdminBonusesRoute
@@ -185,6 +193,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/news': typeof NewsRouteWithChildren
   '/profile': typeof ProfileRoute
+  '/results': typeof ResultsRoute
   '/support': typeof SupportRoute
   '/admin/analyses': typeof AdminAnalysesRouteWithChildren
   '/admin/bonuses': typeof AdminBonusesRoute
@@ -209,6 +218,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/news'
     | '/profile'
+    | '/results'
     | '/support'
     | '/admin/analyses'
     | '/admin/bonuses'
@@ -230,6 +240,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/news'
     | '/profile'
+    | '/results'
     | '/support'
     | '/admin/analyses'
     | '/admin/bonuses'
@@ -252,6 +263,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/news'
     | '/profile'
+    | '/results'
     | '/support'
     | '/admin/analyses'
     | '/admin/bonuses'
@@ -275,6 +287,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   NewsRoute: typeof NewsRouteWithChildren
   ProfileRoute: typeof ProfileRoute
+  ResultsRoute: typeof ResultsRoute
   SupportRoute: typeof SupportRoute
   AnalysisIdRoute: typeof AnalysisIdRoute
 }
@@ -286,6 +299,13 @@ declare module '@tanstack/react-router' {
       path: '/support'
       fullPath: '/support'
       preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/results': {
+      id: '/results'
+      path: '/results'
+      fullPath: '/results'
+      preLoaderRoute: typeof ResultsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -478,6 +498,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   NewsRoute: NewsRouteWithChildren,
   ProfileRoute: ProfileRoute,
+  ResultsRoute: ResultsRoute,
   SupportRoute: SupportRoute,
   AnalysisIdRoute: AnalysisIdRoute,
 }

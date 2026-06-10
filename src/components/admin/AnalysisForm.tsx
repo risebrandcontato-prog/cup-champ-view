@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,10 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Upload, Plus, X, Loader2, AlertTriangle, Search, Link2, CalendarDays, 
-  Shield, Ticket, ExternalLink, Zap, Trash2, ImageIcon, FileText, 
-  Copy, CheckCircle2, ChevronDown, Globe
+import {
+  Upload, Plus, X, Loader2, AlertTriangle, Search, Link2, CalendarDays,
+  Shield, Ticket, ExternalLink, Zap, Trash2, ImageIcon, FileText,
+  ChevronDown, Globe, CheckCircle2
 } from 'lucide-react';
 import { SPORTS, BET_TYPES, BOOKMAKERS } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -18,13 +18,14 @@ import { useNavigate } from '@tanstack/react-router';
 import type { Analysis, AnalysisMatch, AnalysisBet, AnalysisBetSelection } from '@/types';
 import { sendPushNotification } from '@/lib/send-notification';
 
-interface MatchInput { 
-  home_team: string; 
-  away_team: string; 
-  league: string; 
-  bet_type: string; 
-  odds: string; 
-  match_time: string; 
+/* ─── Types ─── */
+interface MatchInput {
+  home_team: string;
+  away_team: string;
+  league: string;
+  bet_type: string;
+  odds: string;
+  match_time: string;
 }
 
 interface BetSelectionInput {
@@ -43,14 +44,104 @@ interface ApiFixture {
   teams: { home: { id: number; name: string }; away: { id: number; name: string } };
 }
 
-export interface AnalysisFormProps { 
-  initial?: Analysis & { matches?: AnalysisMatch[]; bet?: AnalysisBet & { selections?: AnalysisBetSelection[] } }; 
+export interface AnalysisFormProps {
+  initial?: Analysis & {
+    matches?: AnalysisMatch[];
+    bet?: AnalysisBet & { selections?: AnalysisBetSelection[] };
+  };
 }
 
-export function AnalysisForm({ initial }: AnalysisFormProps) {
-  const navigate = useNavigate();
+/* ─── Constants ─── */
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+
+/* ─── Reusable Image Upload Component ─── */
+function ImageUploadField({
+  imageUrl,
+  uploading,
+  onFileSelect,
+  onRemove,
+  label = 'Imagem da Análise',
+  helper = 'Clique para enviar ou arraste uma imagem',
+  required = false,
+}: {
+  imageUrl: string | null;
+  uploading: boolean;
+  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemove: () => void;
+  label?: string;
+  helper?: string;
+  required?: boolean;
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
 
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-bold flex items-center gap-1.5">
+          <ImageIcon className="w-3.5 h-3.5 text-arena-gold" />
+          {label}
+          {required && <span className="text-arena-red">*</span>}
+        </Label>
+        {imageUrl && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-[10px] text-arena-red hover:text-arena-red/80 font-bold flex items-center gap-1"
+          >
+            <X className="w-3 h-3" /> Remover
+          </button>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        className="w-full relative overflow-hidden rounded-2xl border-2 border-dashed border-arena-green/40 bg-arena-gray/10 hover:border-arena-green hover:bg-arena-green/5 transition-all duration-200 flex flex-col items-center justify-center gap-2 min-h-[160px] sm:min-h-[200px]"
+      >
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt="Preview da análise"
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <>
+            <Upload className="w-8 h-8 text-arena-green/70" />
+            <span className="text-xs text-arena-text-secondary text-center px-4">
+              {helper}
+            </span>
+            <span className="text-[10px] text-arena-text-secondary/60">
+              JPG, PNG, WebP • Máx 5MB
+            </span>
+          </>
+        )}
+
+        {uploading && (
+          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2 z-10">
+            <Loader2 className="w-6 h-6 animate-spin text-arena-green" />
+            <span className="text-xs text-white font-medium">Enviando...</span>
+          </div>
+        )}
+      </button>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept={ALLOWED_IMAGE_TYPES.join(',')}
+        hidden
+        onChange={onFileSelect}
+      />
+    </div>
+  );
+}
+
+/* ─── Main Form ─── */
+export function AnalysisForm({ initial }: AnalysisFormProps) {
+  const navigate = useNavigate();
+
+  /* ─── Validation: constants ─── */
   if (!Array.isArray(SPORTS)) {
     return (
       <div className="p-6 rounded-2xl border border-arena-red/30 bg-arena-red/10 text-arena-red">
@@ -70,13 +161,11 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
     );
   }
 
-  // ─── TAB PRINCIPAL: tipo de análise ───
+  /* ─── State ─── */
   const [tab, setTab] = useState<'image' | 'structured'>(initial?.display_type ?? 'image');
-
-  // ─── TIPO DE APOSTA: simples ou múltipla ───
   const [betType, setBetType] = useState<'simples' | 'multipla'>(initial?.bet?.bet_type ?? 'simples');
 
-  // ─── CAMPOS BÁSICOS ───
+  // Basic fields
   const [title, setTitle] = useState(initial?.title ?? '');
   const [sportType, setSportType] = useState(initial?.sport_type ?? 'futebol');
   const [championship, setChampionship] = useState(initial?.championship ?? '');
@@ -85,14 +174,14 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
   const [isHot, setIsHot] = useState(initial?.is_hot ?? false);
   const [isFeatured, setIsFeatured] = useState(initial?.is_featured ?? false);
 
-  // ─── CAMPOS DO BILHETE ───
+  // Bet fields
   const [bookmakerName, setBookmakerName] = useState(initial?.bet?.bookmaker_name ?? initial?.bookmaker_name ?? '');
   const [bookmakerUrl, setBookmakerUrl] = useState(initial?.bet?.bookmaker_url ?? initial?.bookmaker_link ?? '');
   const [stakeValue, setStakeValue] = useState(initial?.bet?.stake_value?.toString() ?? initial?.stake_value?.toString() ?? '');
   const [totalOdds, setTotalOdds] = useState(initial?.bet?.total_odds?.toString() ?? initial?.odds?.toString() ?? '');
   const [betNotes, setBetNotes] = useState(initial?.bet?.notes ?? '');
 
-  // ─── SELEÇÕES DO BILHETE ───
+  // Selections
   const [selections, setSelections] = useState<BetSelectionInput[]>(
     initial?.bet?.selections?.map((s) => ({
       home_team: s.home_team,
@@ -105,15 +194,15 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
     })) ?? []
   );
 
-  // ─── MATCHES LEGACY (compatibilidade) ───
-  const [matches, setMatches] = useState<MatchInput[]>(
-    initial?.matches?.map((m) => ({ 
-      home_team: m.home_team, 
-      away_team: m.away_team, 
-      league: m.league ?? '', 
-      bet_type: m.bet_type ?? 'Resultado Final', 
-      odds: m.odds?.toString() ?? '', 
-      match_time: m.match_time ? m.match_time.slice(0, 16) : '' 
+  // Legacy matches
+  const [matches, setMatches] = useState<<MatchInput[]>(
+    initial?.matches?.map((m) => ({
+      home_team: m.home_team,
+      away_team: m.away_team,
+      league: m.league ?? '',
+      bet_type: m.bet_type ?? 'Resultado Final',
+      odds: m.odds?.toString() ?? '',
+      match_time: m.match_time ? m.match_time.slice(0, 16) : '',
     })) ?? []
   );
 
@@ -122,14 +211,14 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
   const [saving, setSaving] = useState(false);
   const [extracting, setExtracting] = useState(false);
 
-  // ─── API FIXTURE STATES ───
+  // API Fixture
   const [useApiFixture, setUseApiFixture] = useState(!!initial?.fixture_id);
   const [fixtureId, setFixtureId] = useState<number | null>(initial?.fixture_id ?? null);
   const [todayFixtures, setTodayFixtures] = useState<ApiFixture[]>([]);
   const [loadingFixtures, setLoadingFixtures] = useState(false);
   const [fixtureSearch, setFixtureSearch] = useState('');
 
-  // Buscar jogos do dia quando toggle API está ativo
+  /* ─── Effects ─── */
   useEffect(() => {
     if (!useApiFixture) {
       setTodayFixtures([]);
@@ -151,7 +240,9 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
         });
         if (cancelled) return;
         if (error) throw error;
-        const fixtures = (data?.response || []).filter((f: any) => f?.fixture?.id && f?.teams?.home?.name && f?.teams?.away?.name);
+        const fixtures = (data?.response || []).filter(
+          (f: any) => f?.fixture?.id && f?.teams?.home?.name && f?.teams?.away?.name
+        );
         setTodayFixtures(fixtures);
       } catch (err) {
         console.error('[AnalysisForm] Erro ao buscar jogos:', err);
@@ -161,9 +252,12 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [useApiFixture]);
 
+  /* ─── Handlers ─── */
   const selectFixture = useCallback((fixture: ApiFixture) => {
     const home = fixture.teams.home.name;
     const away = fixture.teams.away.name;
@@ -177,16 +271,17 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
     setSportType('futebol');
     setTab('structured');
 
-    // Preenche uma seleção automaticamente
-    setSelections([{
-      home_team: home,
-      away_team: away,
-      league: league,
-      match_time: date ? date.slice(0, 16) : '',
-      market: 'Resultado Final',
-      selection: 'Casa',
-      odds: '',
-    }]);
+    setSelections([
+      {
+        home_team: home,
+        away_team: away,
+        league: league,
+        match_time: date ? date.slice(0, 16) : '',
+        market: 'Resultado Final',
+        selection: 'Casa',
+        odds: '',
+      },
+    ]);
 
     toast.success(`Jogo selecionado: ${home} vs ${away}`);
   }, []);
@@ -197,7 +292,6 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
     setFixtureSearch('');
   }, []);
 
-  // ─── EXTRATOR DE URL (simulação inteligente) ───
   const extractFromUrl = useCallback(async () => {
     if (!bookmakerUrl.trim()) {
       toast.error('Cole a URL do bilhete primeiro');
@@ -206,34 +300,81 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
 
     setExtracting(true);
 
-    // Simulação de extração inteligente baseada na URL
-    // Na prática, não dá para extrair dados reais sem API oficial
-    // Mas podemos tentar identificar a casa e preencher padrões
-
     const url = bookmakerUrl.toLowerCase();
-    let detectedBookmaker = '';
+    const detected =
+      BOOKMAKERS.find((b) => url.includes(b.name.toLowerCase()))?.name ?? '';
 
-    if (url.includes('bet365')) detectedBookmaker = 'Bet365';
-    else if (url.includes('betano')) detectedBookmaker = 'Betano';
-    else if (url.includes('superbet')) detectedBookmaker = 'Superbet';
-    else if (url.includes('sportingbet')) detectedBookmaker = 'Sportingbet';
-    else if (url.includes('kto')) detectedBookmaker = 'KTO';
-    else if (url.includes('blaze')) detectedBookmaker = 'Blaze';
-    else if (url.includes('estrelabet')) detectedBookmaker = 'EstrelaBet';
-
-    if (detectedBookmaker) {
-      setBookmakerName(detectedBookmaker);
+    if (detected) {
+      setBookmakerName(detected);
     }
 
-    // Simula um delay para parecer que está processando
-    await new Promise(r => setTimeout(r, 800));
-
+    await new Promise((r) => setTimeout(r, 600));
     setExtracting(false);
+
     toast.success('URL analisada! Verifique os dados e complete as informações.');
 
-    // Se não tiver seleções, adiciona uma em branco
     if (selections.length === 0) {
-      setSelections([{
+      setSelections([
+        {
+          home_team: '',
+          away_team: '',
+          league: '',
+          match_time: '',
+          market: 'Resultado Final',
+          selection: '',
+          odds: '',
+        },
+      ]);
+    }
+  }, [bookmakerUrl, selections.length]);
+
+  const handleImageUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        toast.error('Formato inválido. Use JPG, PNG ou WebP.');
+        return;
+      }
+
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast.error('Imagem deve ter no máximo 5MB');
+        return;
+      }
+
+      setUploading(true);
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png';
+      const path = `analysis-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+      try {
+        const { error } = await supabase.storage
+          .from('analysis-images')
+          .upload(path, file, { cacheControl: '3600', upsert: false });
+
+        if (error) throw error;
+
+        const { data } = supabase.storage.from('analysis-images').getPublicUrl(path);
+        setImageUrl(data.publicUrl);
+        toast.success('Imagem enviada com sucesso');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Erro no upload';
+        toast.error(msg);
+      } finally {
+        setUploading(false);
+      }
+    },
+    []
+  );
+
+  const removeImage = useCallback(() => {
+    setImageUrl(null);
+  }, []);
+
+  const addSelection = useCallback(() => {
+    setSelections((s) => [
+      ...s,
+      {
         home_team: '',
         away_team: '',
         league: '',
@@ -241,94 +382,55 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
         market: 'Resultado Final',
         selection: '',
         odds: '',
-      }]);
-    }
-  }, [bookmakerUrl, selections.length]);
-
-  const upload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Apenas imagens são permitidas');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Imagem deve ter no máximo 5MB');
-      return;
-    }
-
-    setUploading(true);
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png';
-    const path = `${Date.now()}.${ext}`;
-
-    const { error } = await supabase.storage.from('analysis-images').upload(path, file, {
-      cacheControl: '3600',
-      upsert: false
-    });
-
-    setUploading(false);
-
-    if (error) { 
-      toast.error('Erro no upload: ' + error.message); 
-      return; 
-    }
-
-    const { data } = supabase.storage.from('analysis-images').getPublicUrl(path);
-    setImageUrl(data.publicUrl);
-    toast.success('Imagem enviada');
+      },
+    ]);
   }, []);
 
-  // ─── SELEÇÕES DO BILHETE ───
-  const addSelection = useCallback(() => {
-    setSelections((s) => [...s, { 
-      home_team: '', 
-      away_team: '', 
-      league: '', 
-      match_time: '', 
-      market: 'Resultado Final', 
-      selection: '', 
-      odds: '' 
-    }]);
-  }, []);
-
-  const updateSelection = useCallback((i: number, k: keyof BetSelectionInput, v: string) => {
-    setSelections((arr) => arr.map((s, idx) => idx === i ? { ...s, [k]: v } : s));
-  }, []);
+  const updateSelection = useCallback(
+    (i: number, k: keyof BetSelectionInput, v: string) => {
+      setSelections((arr) => arr.map((s, idx) => (idx === i ? { ...s, [k]: v } : s)));
+    },
+    []
+  );
 
   const removeSelection = useCallback((i: number) => {
     setSelections((arr) => arr.filter((_, idx) => idx !== i));
   }, []);
 
-  // ─── MATCHES LEGACY ───
   const addMatch = useCallback(() => {
-    setMatches((m) => [...m, { 
-      home_team: '', 
-      away_team: '', 
-      league: '', 
-      bet_type: 'Resultado Final', 
-      odds: '', 
-      match_time: '' 
-    }]);
+    setMatches((m) => [
+      ...m,
+      {
+        home_team: '',
+        away_team: '',
+        league: '',
+        bet_type: 'Resultado Final',
+        odds: '',
+        match_time: '',
+      },
+    ]);
   }, []);
 
-  const updateMatch = useCallback((i: number, k: keyof MatchInput, v: string) => {
-    setMatches((arr) => arr.map((m, idx) => idx === i ? { ...m, [k]: v } : m));
-  }, []);
+  const updateMatch = useCallback(
+    (i: number, k: keyof MatchInput, v: string) => {
+      setMatches((arr) => arr.map((m, idx) => (idx === i ? { ...m, [k]: v } : m)));
+    },
+    []
+  );
 
   const removeMatch = useCallback((i: number) => {
     setMatches((arr) => arr.filter((_, idx) => idx !== i));
   }, []);
 
+  /* ─── Save ─── */
   const save = useCallback(async () => {
-    if (!title.trim()) { 
-      toast.error('Preencha o título'); 
-      return; 
+    if (!title.trim()) {
+      toast.error('Preencha o título');
+      return;
     }
-    if (!sportType) { 
-      toast.error('Selecione o esporte'); 
-      return; 
+    if (!sportType) {
+      toast.error('Selecione o esporte');
+      return;
     }
     if (tab === 'image' && !imageUrl && !initial?.image_url) {
       toast.error('Envie uma imagem para análise por imagem');
@@ -337,34 +439,37 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
 
     setSaving(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error('Usuário não autenticado');
-      setSaving(false);
-      return;
-    }
-
-    const payload = {
-      title: title.trim(), 
-      sport_type: sportType, 
-      championship: championship.trim() || null, 
-      description: description.trim() || null,
-      image_url: tab === 'image' ? imageUrl : null,
-      is_hot: isHot, 
-      is_featured: isFeatured, 
-      display_type: tab,
-      stake_value: stakeValue ? parseFloat(stakeValue) : null,
-      bookmaker_name: bookmakerName.trim() || null, 
-      bookmaker_link: bookmakerUrl.trim() || null,
-      odds: totalOdds ? parseFloat(totalOdds) : null,
-      match_date: matchDate || null,
-      fixture_id: fixtureId,
-      created_by: user.id,
-    };
-
-    let analysisId = initial?.id;
-
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        toast.error('Usuário não autenticado');
+        setSaving(false);
+        return;
+      }
+
+      const payload = {
+        title: title.trim(),
+        sport_type: sportType,
+        championship: championship.trim() || null,
+        description: description.trim() || null,
+        image_url: imageUrl,
+        is_hot: isHot,
+        is_featured: isFeatured,
+        display_type: tab,
+        stake_value: stakeValue ? parseFloat(stakeValue) : null,
+        bookmaker_name: bookmakerName.trim() || null,
+        bookmaker_link: bookmakerUrl.trim() || null,
+        odds: totalOdds ? parseFloat(totalOdds) : null,
+        match_date: matchDate || null,
+        fixture_id: fixtureId,
+        created_by: user.id,
+      };
+
+      let analysisId = initial?.id;
+
       if (initial?.id) {
         const { error } = await supabase
           .from('analyses')
@@ -385,12 +490,13 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
         analysisId = data.id;
       }
 
-      // ─── SALVAR BILHETE (analysis_bets) ───
+      // Save structured bet
       if (analysisId && tab === 'structured') {
-        // Deleta bilhete antigo se existir
         await supabase.from('analysis_bets').delete().eq('analysis_id', analysisId);
 
-        const validSelections = selections.filter(s => s.home_team.trim() && s.away_team.trim() && s.selection.trim());
+        const validSelections = selections.filter(
+          (s) => s.home_team.trim() && s.away_team.trim() && s.selection.trim()
+        );
 
         if (validSelections.length > 0 || bookmakerUrl.trim()) {
           const { data: betData, error: betError } = await supabase
@@ -410,51 +516,54 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
 
           if (betError) throw betError;
 
-          // Salvar seleções
           if (betData?.id && validSelections.length > 0) {
             const { error: selError } = await supabase
               .from('analysis_bet_selections')
-              .insert(validSelections.map((s, idx) => ({
-                bet_id: betData.id,
-                home_team: s.home_team.trim(),
-                away_team: s.away_team.trim(),
-                league: s.league.trim() || null,
-                match_time: s.match_time || null,
-                market: s.market,
-                selection: s.selection.trim(),
-                odds: s.odds ? parseFloat(s.odds) : null,
-                sort_order: idx,
-              })));
+              .insert(
+                validSelections.map((s, idx) => ({
+                  bet_id: betData.id,
+                  home_team: s.home_team.trim(),
+                  away_team: s.away_team.trim(),
+                  league: s.league.trim() || null,
+                  match_time: s.match_time || null,
+                  market: s.market,
+                  selection: s.selection.trim(),
+                  odds: s.odds ? parseFloat(s.odds) : null,
+                  sort_order: idx,
+                }))
+              );
 
             if (selError) throw selError;
           }
         }
       }
 
-      // ─── SALVAR MATCHES LEGACY (compatibilidade) ───
+      // Save legacy matches
       if (tab === 'structured' && analysisId) {
         await supabase.from('analysis_matches').delete().eq('analysis_id', analysisId);
 
-        const validMatches = matches.filter(m => m.home_team.trim() && m.away_team.trim());
+        const validMatches = matches.filter((m) => m.home_team.trim() && m.away_team.trim());
 
         if (validMatches.length) {
           const { error: matchesError } = await supabase
             .from('analysis_matches')
-            .insert(validMatches.map((m) => ({
-              analysis_id: analysisId,
-              home_team: m.home_team.trim(), 
-              away_team: m.away_team.trim(),
-              league: m.league.trim() || null, 
-              bet_type: m.bet_type,
-              odds: m.odds ? parseFloat(m.odds) : null, 
-              match_time: m.match_time || null,
-            })));
+            .insert(
+              validMatches.map((m) => ({
+                analysis_id: analysisId,
+                home_team: m.home_team.trim(),
+                away_team: m.away_team.trim(),
+                league: m.league.trim() || null,
+                bet_type: m.bet_type,
+                odds: m.odds ? parseFloat(m.odds) : null,
+                match_time: m.match_time || null,
+              }))
+            );
 
           if (matchesError) throw matchesError;
         }
       }
 
-      // ─── NOTIFICAÇÃO PUSH ───
+      // Push notification (only on create)
       if (!initial?.id && analysisId) {
         const pushTitle = isHot ? '🔥 ' + title.trim() : '⚽ ' + title.trim();
         const pushBody = description.trim().slice(0, 120) || 'Nova análise esportiva disponível!';
@@ -470,7 +579,6 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
         });
 
         if (pushResult.success) {
-          console.log(`[AnalysisForm] Push sent to ${pushResult.sent} users`);
           toast.success(`Notificação enviada para ${pushResult.sent} usuários`);
         } else {
           console.warn('[AnalysisForm] Push failed:', pushResult.error);
@@ -485,37 +593,73 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
     } finally {
       setSaving(false);
     }
-  }, [title, sportType, championship, description, imageUrl, isHot, isFeatured, tab, stakeValue, bookmakerName, bookmakerUrl, totalOdds, betNotes, betType, selections, matches, matchDate, fixtureId, initial, navigate]);
+  }, [
+    title,
+    sportType,
+    championship,
+    description,
+    imageUrl,
+    isHot,
+    isFeatured,
+    tab,
+    stakeValue,
+    bookmakerName,
+    bookmakerUrl,
+    totalOdds,
+    betNotes,
+    betType,
+    selections,
+    matches,
+    matchDate,
+    fixtureId,
+    initial,
+    navigate,
+  ]);
 
-  const filteredFixtures = todayFixtures.filter((f) => {
-    if (!fixtureSearch.trim()) return true;
+  /* ─── Derived state ─── */
+  const filteredFixtures = useMemo(() => {
+    if (!fixtureSearch.trim()) return todayFixtures;
     const search = fixtureSearch.toLowerCase();
-    return (
-      f.teams.home.name.toLowerCase().includes(search) ||
-      f.teams.away.name.toLowerCase().includes(search) ||
-      f.league.name.toLowerCase().includes(search)
+    return todayFixtures.filter(
+      (f) =>
+        f.teams.home.name.toLowerCase().includes(search) ||
+        f.teams.away.name.toLowerCase().includes(search) ||
+        f.league.name.toLowerCase().includes(search)
     );
-  });
+  }, [todayFixtures, fixtureSearch]);
 
-  const bookmakerColor = BOOKMAKERS.find(b => b.name === bookmakerName)?.color ?? '#00C853';
+  const bookmakerColor = useMemo(
+    () => BOOKMAKERS.find((b) => b.name === bookmakerName)?.color ?? '#00C853',
+    [bookmakerName]
+  );
 
+  const potentialReturn = useMemo(() => {
+    const stake = parseFloat(stakeValue);
+    const odds = parseFloat(totalOdds);
+    if (!stake || !odds || stake <= 0 || odds <= 0) return null;
+    return (stake * odds).toFixed(2);
+  }, [stakeValue, totalOdds]);
+
+  /* ─── Render ─── */
   return (
     <div className="space-y-4 max-w-3xl">
-      {/* ─── HEADER DO FORMULÁRIO ─── */}
+      {/* Header */}
       <div className="rounded-2xl border border-arena-gray bg-arena-dark p-4">
         <div className="flex items-center gap-2 mb-3">
           <Ticket className="w-5 h-5 text-arena-gold" />
-          <span className="text-sm font-black uppercase tracking-wider">Nova Análise</span>
+          <span className="text-sm font-black uppercase tracking-wider">
+            {initial ? 'Editar Análise' : 'Nova Análise'}
+          </span>
         </div>
 
-        {/* Tipo de Aposta */}
+        {/* Bet type */}
         <div className="flex items-center gap-3 mb-4">
           <button
             type="button"
             onClick={() => setBetType('simples')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              betType === 'simples' 
-                ? 'bg-arena-green text-black shadow-lg shadow-arena-green/20' 
+              betType === 'simples'
+                ? 'bg-arena-green text-black shadow-lg shadow-arena-green/20'
                 : 'bg-arena-gray/40 text-arena-text-secondary hover:text-white'
             }`}
           >
@@ -525,8 +669,8 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
             type="button"
             onClick={() => setBetType('multipla')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              betType === 'multipla' 
-                ? 'bg-arena-gold text-black shadow-lg shadow-arena-gold/20' 
+              betType === 'multipla'
+                ? 'bg-arena-gold text-black shadow-lg shadow-arena-gold/20'
                 : 'bg-arena-gray/40 text-arena-text-secondary hover:text-white'
             }`}
           >
@@ -534,7 +678,7 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
           </button>
         </div>
 
-        {/* Tipo de Display */}
+        {/* Display type */}
         <Tabs value={tab} onValueChange={(v) => setTab(v as 'image' | 'structured')}>
           <TabsList className="bg-arena-gray/40 w-full">
             <TabsTrigger value="image" className="flex-1 gap-1">
@@ -547,16 +691,18 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
         </Tabs>
       </div>
 
-      {/* ─── URL DO BILHETE ─── */}
+      {/* ─── URL DO BILHETE (structured only) ─── */}
       {tab === 'structured' && (
         <div className="rounded-2xl border border-arena-gray bg-arena-dark p-4 space-y-3">
           <div className="flex items-center gap-2 mb-1">
             <ExternalLink className="w-4 h-4 text-arena-green" />
             <span className="text-sm font-bold">Link do Bilhete</span>
-            <span className="text-[10px] text-arena-text-secondary ml-auto">Cole a URL da casa de aposta</span>
+            <span className="text-[10px] text-arena-text-secondary ml-auto">
+              Cole a URL da casa de aposta
+            </span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
               <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-arena-text-secondary" />
               <Input
@@ -570,24 +716,31 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
               type="button"
               onClick={extractFromUrl}
               disabled={extracting || !bookmakerUrl.trim()}
-              className="bg-arena-green text-black font-bold rounded-xl hover:bg-arena-green-dark disabled:opacity-50"
+              className="bg-arena-green text-black font-bold rounded-xl hover:bg-arena-green-dark disabled:opacity-50 shrink-0"
             >
-              {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-              <span className="hidden sm:inline ml-1">Extrair</span>
+              {extracting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Zap className="w-4 h-4" />
+              )}
+              <span className="ml-1">Extrair</span>
             </Button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Label className="text-xs text-arena-text-secondary">Casa:</Label>
             <Select value={bookmakerName} onValueChange={setBookmakerName}>
-              <SelectTrigger className="w-40 bg-arena-gray/40 border-arena-gray rounded-lg text-xs h-8">
+              <SelectTrigger className="w-44 bg-arena-gray/40 border-arena-gray rounded-lg text-xs h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {BOOKMAKERS.map((b) => (
                   <SelectItem key={b.id} value={b.name}>
                     <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: b.color }} />
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: b.color }}
+                      />
                       {b.name}
                     </span>
                   </SelectItem>
@@ -596,7 +749,7 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
             </Select>
 
             {bookmakerName && (
-              <span 
+              <span
                 className="px-2 py-0.5 rounded text-[10px] font-bold text-black"
                 style={{ backgroundColor: bookmakerColor }}
               >
@@ -614,17 +767,17 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
             <Link2 className="w-4 h-4 text-arena-green" />
             <span className="text-sm font-bold">Vincular a Jogo da API</span>
           </div>
-          <Switch 
-            checked={useApiFixture} 
+          <Switch
+            checked={useApiFixture}
             onCheckedChange={(v) => {
               setUseApiFixture(v);
               if (!v) clearFixture();
-            }} 
+            }}
           />
         </div>
         <p className="text-xs text-arena-text-secondary">
-          {useApiFixture 
-            ? 'Selecione um jogo do dia para preencher automaticamente os dados da análise.' 
+          {useApiFixture
+            ? 'Selecione um jogo do dia para preencher automaticamente os dados da análise.'
             : 'Crie a análise manualmente sem vinculação à API.'}
         </p>
       </div>
@@ -636,26 +789,30 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
               <CalendarDays className="w-3 h-3" /> Jogos de Hoje
             </span>
             {fixtureId && (
-              <Button 
-                type="button" 
-                size="sm" 
-                variant="ghost" 
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
                 onClick={clearFixture}
                 className="text-arena-red text-xs h-7"
               >
-                <X className="w-3 h-3 mr-1" /> Limpar seleção
+                <X className="w-3 h-3 mr-1" /> Limpar
               </Button>
             )}
           </div>
 
           {fixtureId ? (
             <div className="p-3 rounded-xl bg-arena-green/10 border border-arena-green/30 flex items-center gap-3">
-              <Shield className="w-5 h-5 text-arena-green" />
+              <Shield className="w-5 h-5 text-arena-green shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold truncate">{title}</p>
-                <p className="text-xs text-arena-text-secondary">{championship} • ID: {fixtureId}</p>
+                <p className="text-xs text-arena-text-secondary">
+                  {championship} • ID: {fixtureId}
+                </p>
               </div>
-              <span className="px-2 py-0.5 rounded bg-arena-green text-black text-[10px] font-black">SELECIONADO</span>
+              <span className="px-2 py-0.5 rounded bg-arena-green text-black text-[10px] font-black shrink-0">
+                SELECIONADO
+              </span>
             </div>
           ) : (
             <>
@@ -676,7 +833,9 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
                 </div>
               ) : filteredFixtures.length === 0 ? (
                 <p className="text-xs text-arena-text-secondary text-center py-4">
-                  {fixtureSearch.trim() ? 'Nenhum jogo encontrado.' : 'Nenhum jogo disponível para hoje.'}
+                  {fixtureSearch.trim()
+                    ? 'Nenhum jogo encontrado.'
+                    : 'Nenhum jogo disponível para hoje.'}
                 </p>
               ) : (
                 <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
@@ -688,9 +847,14 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
                       className="w-full text-left p-3 rounded-xl bg-arena-gray/20 border border-arena-gray/30 hover:border-arena-green/50 hover:bg-arena-green/5 transition-colors"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] text-arena-text-secondary font-bold">{f.league.name}</span>
+                        <span className="text-[10px] text-arena-text-secondary font-bold">
+                          {f.league.name}
+                        </span>
                         <span className="text-[10px] text-arena-text-secondary">
-                          {new Date(f.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(f.fixture.date).toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-sm font-bold">
@@ -707,46 +871,49 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
         </div>
       )}
 
-      {/* ─── CONTEÚDO POR TAB ─── */}
+      {/* ─── TABS CONTENT ─── */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'image' | 'structured')}>
+        {/* ─── IMAGE TAB ─── */}
         <TabsContent value="image" className="space-y-3 mt-0">
-          <button 
-            type="button" 
-            onClick={() => fileRef.current?.click()}
-            className="w-full aspect-video rounded-2xl border-2 border-dashed border-arena-green/50 bg-arena-gray/20 flex flex-col items-center justify-center gap-2 hover:border-arena-green transition relative overflow-hidden"
-          >
-            {imageUrl ? (
-              <img src={imageUrl} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
-            ) : (
-              <>
-                <Upload className="w-10 h-10 text-arena-green" />
-                <span className="text-sm text-arena-text-secondary">Clique para enviar imagem</span>
-              </>
-            )}
-            {uploading && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-arena-green" />
-              </div>
-            )}
-          </button>
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={upload} />
+          <ImageUploadField
+            imageUrl={imageUrl}
+            uploading={uploading}
+            onFileSelect={handleImageUpload}
+            onRemove={removeImage}
+            label="Imagem da Análise"
+            helper="Clique para enviar a imagem do bilhete"
+            required
+          />
         </TabsContent>
 
+        {/* ─── STRUCTURED TAB ─── */}
         <TabsContent value="structured" className="space-y-4 mt-0">
-          {/* ─── SELEÇÕES DO BILHETE ─── */}
+          {/* 🆕 UPLOAD DE IMAGEM TAMBÉM NA ESTRUTURADA */}
+          <ImageUploadField
+            imageUrl={imageUrl}
+            uploading={uploading}
+            onFileSelect={handleImageUpload}
+            onRemove={removeImage}
+            label="Imagem do Bilhete (Opcional)"
+            helper="Anexe a imagem do bilhete para referência"
+          />
+
+          {/* Selections */}
           <div className="rounded-2xl border border-arena-gray bg-arena-dark p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Ticket className="w-4 h-4 text-arena-gold" />
                 <span className="text-sm font-bold">
-                  {betType === 'simples' ? 'Seleção do Bilhete' : `Seleções do Bilhete (${selections.length})`}
+                  {betType === 'simples'
+                    ? 'Seleção do Bilhete'
+                    : `Seleções do Bilhete (${selections.length})`}
                 </span>
               </div>
-              <Button 
-                type="button" 
-                size="sm" 
-                variant="outline" 
-                onClick={addSelection} 
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={addSelection}
                 className="border-arena-green text-arena-green text-xs h-8"
               >
                 <Plus className="w-3 h-3 mr-1" /> Adicionar
@@ -755,78 +922,83 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
 
             <div className="space-y-3">
               {selections.map((s, i) => (
-                <div key={i} className="rounded-xl border border-arena-gray bg-arena-gray/20 p-3 space-y-2 relative">
+                <div
+                  key={i}
+                  className="rounded-xl border border-arena-gray bg-arena-gray/20 p-3 space-y-2 relative"
+                >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] font-bold text-arena-gold uppercase tracking-wider">
                       {betType === 'multipla' ? `Jogo ${i + 1}` : 'Jogo'}
                     </span>
-                    <button 
-                      type="button" 
-                      onClick={() => removeSelection(i)} 
+                    <button
+                      type="button"
+                      onClick={() => removeSelection(i)}
                       className="text-arena-red hover:text-arena-red/80 p-1"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input 
-                      placeholder="Time Casa *" 
-                      value={s.home_team} 
-                      onChange={(e) => updateSelection(i, 'home_team', e.target.value)} 
-                      className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm" 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Time Casa *"
+                      value={s.home_team}
+                      onChange={(e) => updateSelection(i, 'home_team', e.target.value)}
+                      className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm"
                     />
-                    <Input 
-                      placeholder="Time Fora *" 
-                      value={s.away_team} 
-                      onChange={(e) => updateSelection(i, 'away_team', e.target.value)} 
-                      className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm" 
+                    <Input
+                      placeholder="Time Fora *"
+                      value={s.away_team}
+                      onChange={(e) => updateSelection(i, 'away_team', e.target.value)}
+                      className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm"
                     />
                   </div>
 
-                  <Input 
-                    placeholder="Liga/Campeonato" 
-                    value={s.league} 
-                    onChange={(e) => updateSelection(i, 'league', e.target.value)} 
-                    className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm" 
+                  <Input
+                    placeholder="Liga/Campeonato"
+                    value={s.league}
+                    onChange={(e) => updateSelection(i, 'league', e.target.value)}
+                    className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm"
                   />
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <Select 
-                      value={s.market} 
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <Select
+                      value={s.market}
                       onValueChange={(v) => updateSelection(i, 'market', v)}
                     >
-                      <SelectTrigger className="bg-arena-gray/40 border-arena-gray rounded-lg col-span-1 text-xs">
+                      <SelectTrigger className="bg-arena-gray/40 border-arena-gray rounded-lg text-xs">
                         <SelectValue placeholder="Mercado" />
                       </SelectTrigger>
                       <SelectContent>
                         {BET_TYPES.map((b) => (
-                          <SelectItem key={b} value={b} className="text-xs">{b}</SelectItem>
+                          <SelectItem key={String(b)} value={String(b)} className="text-xs">
+                            {String(b)}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input 
-                      placeholder="Seleção *" 
-                      value={s.selection} 
-                      onChange={(e) => updateSelection(i, 'selection', e.target.value)} 
-                      className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm" 
+                    <Input
+                      placeholder="Seleção *"
+                      value={s.selection}
+                      onChange={(e) => updateSelection(i, 'selection', e.target.value)}
+                      className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm"
                     />
-                    <Input 
-                      type="number" 
+                    <Input
+                      type="number"
                       min="0"
-                      step="0.01" 
-                      placeholder="Odds" 
-                      value={s.odds} 
-                      onChange={(e) => updateSelection(i, 'odds', e.target.value)} 
-                      className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm" 
+                      step="0.01"
+                      placeholder="Odds"
+                      value={s.odds}
+                      onChange={(e) => updateSelection(i, 'odds', e.target.value)}
+                      className="bg-arena-gray/40 border-arena-gray rounded-lg text-sm"
                     />
                   </div>
 
-                  <Input 
-                    type="datetime-local" 
-                    value={s.match_time} 
-                    onChange={(e) => updateSelection(i, 'match_time', e.target.value)} 
-                    className="bg-arena-gray/40 border-arena-gray rounded-lg text-xs" 
+                  <Input
+                    type="datetime-local"
+                    value={s.match_time}
+                    onChange={(e) => updateSelection(i, 'match_time', e.target.value)}
+                    className="bg-arena-gray/40 border-arena-gray rounded-lg text-xs"
                   />
                 </div>
               ))}
@@ -842,106 +1014,111 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
             </div>
           </div>
 
-          {/* ─── VALORES DO BILHETE ─── */}
+          {/* Bet values */}
           <div className="rounded-2xl border border-arena-gray bg-arena-dark p-4">
             <div className="flex items-center gap-2 mb-3">
               <Zap className="w-4 h-4 text-arena-green" />
               <span className="text-sm font-bold">Valores do Bilhete</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs text-arena-text-secondary">Stake/Valor (R$)</Label>
-                <Input 
-                  type="number" 
-                  min="0" 
+                <Input
+                  type="number"
+                  min="0"
                   step="0.01"
-                  value={stakeValue} 
-                  onChange={(e) => setStakeValue(e.target.value)} 
-                  className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1 text-sm" 
+                  value={stakeValue}
+                  onChange={(e) => setStakeValue(e.target.value)}
+                  className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1 text-sm"
                   placeholder="0,00"
                 />
               </div>
               <div>
                 <Label className="text-xs text-arena-text-secondary">Odds Total</Label>
-                <Input 
-                  type="number" 
+                <Input
+                  type="number"
                   min="0"
-                  step="0.01" 
-                  value={totalOdds} 
-                  onChange={(e) => setTotalOdds(e.target.value)} 
-                  className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1 text-sm" 
+                  step="0.01"
+                  value={totalOdds}
+                  onChange={(e) => setTotalOdds(e.target.value)}
+                  className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1 text-sm"
                   placeholder="@0.00"
                 />
               </div>
             </div>
 
-            {stakeValue && totalOdds && (
+            {potentialReturn && (
               <div className="mt-3 p-3 rounded-xl bg-arena-green/10 border border-arena-green/30">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-arena-text-secondary">Retorno Potencial:</span>
                   <span className="text-lg font-black text-arena-green">
-                    R$ {(parseFloat(stakeValue) * parseFloat(totalOdds)).toFixed(2)}
+                    R$ {potentialReturn}
                   </span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* ─── OBSERVAÇÕES ─── */}
+          {/* Notes */}
           <div className="rounded-2xl border border-arena-gray bg-arena-dark p-4">
             <Label className="text-xs text-arena-text-secondary flex items-center gap-1 mb-2">
               <FileText className="w-3 h-3" /> Observações do Admin
             </Label>
-            <Textarea 
-              rows={3} 
-              value={betNotes} 
-              onChange={(e) => setBetNotes(e.target.value)} 
-              className="bg-arena-gray/40 border-arena-gray rounded-xl text-sm" 
+            <Textarea
+              rows={3}
+              value={betNotes}
+              onChange={(e) => setBetNotes(e.target.value)}
+              className="bg-arena-gray/40 border-arena-gray rounded-xl text-sm"
               placeholder="Notas internas sobre o bilhete..."
             />
           </div>
 
-          {/* ─── MATCHES LEGACY (compatibilidade, oculto por padrão) ─── */}
+          {/* Legacy matches */}
           <details className="rounded-2xl border border-arena-gray/50 bg-arena-dark/50">
-            <summary className="p-3 text-xs text-arena-text-secondary cursor-pointer flex items-center gap-2 hover:text-white transition-colors list-none">
+            <summary className="p-3 text-xs text-arena-text-secondary cursor-pointer flex items-center gap-2 hover:text-white transition-colors list-none select-none">
               <ChevronDown className="w-3 h-3" />
               Dados Legados (matches antigos)
             </summary>
             <div className="p-3 pt-0 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-arena-text-secondary">Compatibilidade com versão anterior</span>
-                <Button 
-                  type="button" 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={addMatch} 
+                <span className="text-[10px] text-arena-text-secondary">
+                  Compatibilidade com versão anterior
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={addMatch}
                   className="border-arena-gray text-arena-text-secondary text-xs h-7"
                 >
                   <Plus className="w-3 h-3 mr-1" /> Adicionar
                 </Button>
               </div>
               {matches.map((m, i) => (
-                <div key={i} className="border border-arena-gray/50 rounded-lg p-2 space-y-1 relative">
-                  <button 
-                    type="button" 
-                    onClick={() => removeMatch(i)} 
+                <div
+                  key={i}
+                  className="border border-arena-gray/50 rounded-lg p-2 space-y-1 relative"
+                >
+                  <button
+                    type="button"
+                    onClick={() => removeMatch(i)}
                     className="absolute top-1 right-1 text-arena-red"
                   >
                     <X className="w-3 h-3" />
                   </button>
                   <div className="grid grid-cols-2 gap-1">
-                    <Input 
-                      placeholder="Casa" 
-                      value={m.home_team} 
-                      onChange={(e) => updateMatch(i, 'home_team', e.target.value)} 
-                      className="bg-arena-gray/40 border-arena-gray rounded text-xs h-7" 
+                    <Input
+                      placeholder="Casa"
+                      value={m.home_team}
+                      onChange={(e) => updateMatch(i, 'home_team', e.target.value)}
+                      className="bg-arena-gray/40 border-arena-gray rounded text-xs h-7"
                     />
-                    <Input 
-                      placeholder="Fora" 
-                      value={m.away_team} 
-                      onChange={(e) => updateMatch(i, 'away_team', e.target.value)} 
-                      className="bg-arena-gray/40 border-arena-gray rounded text-xs h-7" 
+                    <Input
+                      placeholder="Fora"
+                      value={m.away_team}
+                      onChange={(e) => updateMatch(i, 'away_team', e.target.value)}
+                      className="bg-arena-gray/40 border-arena-gray rounded text-xs h-7"
                     />
                   </div>
                 </div>
@@ -951,18 +1128,19 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
         </TabsContent>
       </Tabs>
 
-      {/* ─── CAMPOS COMUNS ─── */}
+      {/* ─── COMMON FIELDS ─── */}
       <div className="space-y-3 pt-2 border-t border-arena-gray">
         <div>
           <Label>Título *</Label>
-          <Input 
-            value={title} 
-            onChange={(e) => setTitle(e.target.value)} 
-            className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1" 
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1"
             placeholder="Ex: Palmeiras vs Flamengo - Brasileirão"
           />
         </div>
-        <div className="grid md:grid-cols-2 gap-3">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label>Esporte *</Label>
             <Select value={sportType} onValueChange={setSportType}>
@@ -971,61 +1149,69 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
               </SelectTrigger>
               <SelectContent>
                 {SPORTS.filter((s) => s.id !== 'all').map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <Label>Campeonato</Label>
-            <Input 
-              value={championship} 
-              onChange={(e) => setChampionship(e.target.value)} 
-              className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1" 
+            <Input
+              value={championship}
+              onChange={(e) => setChampionship(e.target.value)}
+              className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1"
               placeholder="Ex: Copa do Mundo 2026"
             />
           </div>
         </div>
+
         <div>
           <Label>Data do Jogo</Label>
-          <Input 
+          <Input
             type="datetime-local"
-            value={matchDate} 
-            onChange={(e) => setMatchDate(e.target.value)} 
-            className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1" 
+            value={matchDate}
+            onChange={(e) => setMatchDate(e.target.value)}
+            className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1"
           />
         </div>
+
         <div>
           <Label>Descrição da Análise</Label>
-          <Textarea 
-            rows={4} 
-            value={description} 
-            onChange={(e) => setDescription(e.target.value)} 
-            className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1" 
+          <Textarea
+            rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="bg-arena-gray/40 border-arena-gray rounded-xl mt-1"
             placeholder="Descreva a análise, estatísticas, motivação..."
           />
         </div>
-        <div className="flex items-center gap-6">
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Switch checked={isHot} onCheckedChange={setIsHot} /> 
-            Análise Quente 🔥
+            <Switch checked={isHot} onCheckedChange={setIsHot} />
+            <span className="select-none">Análise Quente 🔥</span>
           </label>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Switch checked={isFeatured} onCheckedChange={setIsFeatured} /> 
-            Destaque ⭐
+            <Switch checked={isFeatured} onCheckedChange={setIsFeatured} />
+            <span className="select-none">Destaque ⭐</span>
           </label>
         </div>
       </div>
 
-      <Button 
-        onClick={save} 
-        disabled={saving} 
+      {/* Submit */}
+      <Button
+        onClick={save}
+        disabled={saving}
         className="w-full h-12 bg-arena-green text-black font-bold rounded-xl hover:bg-arena-green-dark disabled:opacity-50"
       >
         {saving ? (
           <Loader2 className="w-5 h-5 animate-spin" />
+        ) : initial ? (
+          'Salvar Alterações'
         ) : (
-          initial ? 'Salvar Alterações' : 'Publicar Análise'
+          'Publicar Análise'
         )}
       </Button>
     </div>
