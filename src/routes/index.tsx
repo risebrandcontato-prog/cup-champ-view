@@ -28,8 +28,6 @@ export const Route = createFileRoute('/')({
    ═══════════════════════════════════════════════════════════════ */
 function HomePage() {
   const { profile } = useAuth()
-  const [sport, setSport] = useState('all')
-  const [searchQuery, setSearchQuery] = useState('')
   const [items, setItems] = useState<Analysis[] | null>(null)
   const [newsPreview, setNewsPreview] = useState<NewsItem[] | null>(null)
   const [stats, setStats] = useState({ total: 0, hot: 0, green: 0, pending: 0, greenRate: 0 })
@@ -43,29 +41,27 @@ function HomePage() {
 
   useEffect(() => {
     setItems(null)
-    let q = db
+    db
       .from('analyses')
       .select('*')
       .order('is_hot', { ascending: false })
       .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(80)
-
-    if (sport !== 'all') q = q.eq('sport_type', sport)
-    q.then(({ data }: { data: Analysis[] | null }) => {
-      const list = data ?? []
-      const resolved = list.filter(a => a.status === 'green' || a.status === 'red')
-      const greenCount = list.filter(a => a.status === 'green').length
-      setItems(list)
-      setStats({
-        total: list.length,
-        hot: list.filter(a => a.is_hot).length,
-        green: greenCount,
-        pending: list.filter(a => a.status === 'pending').length,
-        greenRate: resolved.length > 0 ? Math.round((greenCount / resolved.length) * 100) : 0,
+      .then(({ data }: { data: Analysis[] | null }) => {
+        const list = data ?? []
+        const resolved = list.filter(a => a.status === 'green' || a.status === 'red')
+        const greenCount = list.filter(a => a.status === 'green').length
+        setItems(list)
+        setStats({
+          total: list.length,
+          hot: list.filter(a => a.is_hot).length,
+          green: greenCount,
+          pending: list.filter(a => a.status === 'pending').length,
+          greenRate: resolved.length > 0 ? Math.round((greenCount / resolved.length) * 100) : 0,
+        })
       })
-    })
-  }, [sport])
+  }, [])
 
   // Buscar preview de notícias
   useEffect(() => {
@@ -77,25 +73,16 @@ function HomePage() {
       .then(({ data }: { data: NewsItem[] | null }) => setNewsPreview(data ?? []))
   }, [])
 
-  const filteredItems = useMemo(() => {
-    if (!items) return null
-    if (!searchQuery.trim()) return items
-    const q = searchQuery.toLowerCase()
-    return items.filter(a =>
-      a.title.toLowerCase().includes(q) ||
-      (a.championship?.toLowerCase() ?? '').includes(q) ||
-      (a.description?.toLowerCase() ?? '').includes(q) ||
-      (a.bookmaker_name?.toLowerCase() ?? '').includes(q)
-    )
-  }, [items, searchQuery])
-
-  const hot = (filteredItems ?? []).filter((a) => a.is_hot).slice(0, 8)
-  const featured = (filteredItems ?? []).filter((a) => a.is_featured && !a.is_hot).slice(0, 5)
-  const rest = (filteredItems ?? []).filter((a) => !a.is_hot && !a.is_featured)
+  const hot = (items ?? []).filter((a) => a.is_hot).slice(0, 8)
+  const featured = (items ?? []).filter((a) => a.is_featured && !a.is_hot).slice(0, 5)
+  const rest = (items ?? []).filter((a) => !a.is_hot && !a.is_featured)
 
   const firstName = profile?.name?.split(' ')[0] ?? 'Membro'
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+
+  // Avatar do usuário (profile.avatar_url ou fallback)
+  const avatarUrl = profile?.avatar_url ?? null
 
   return (
     <AppShell>
@@ -127,13 +114,29 @@ function HomePage() {
                 {greeting}
               </motion.p>
               <div className="flex items-center gap-2.5">
+                {/* 🆕 AVATAR REDONDO — puxa foto do perfil */}
                 <motion.div
                   initial={{ scale: 0, rotate: -20 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ delay: 0.3, type: 'spring', stiffness: 260, damping: 20 }}
-                  className="w-11 h-11 rounded-2xl bg-gradient-to-br from-arena-green/25 to-arena-green/5 border border-arena-green/30 flex items-center justify-center shadow-lg shadow-arena-green/10"
+                  className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-arena-green/30 shadow-lg shadow-arena-green/10 shrink-0"
                 >
-                  <Crown className="w-5 h-5 text-arena-green" strokeWidth={1.5} />
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={firstName}
+                      className="w-full h-full object-cover"
+                      loading="eager"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-arena-green/25 to-arena-green/5 flex items-center justify-center">
+                      <span className="text-lg font-black text-arena-green">
+                        {firstName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  {/* Online indicator */}
+                  <div className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-arena-green border-2 border-arena-dark" />
                 </motion.div>
                 <div>
                   <h1 className="text-xl font-black text-white tracking-tight leading-none">
@@ -266,69 +269,71 @@ function HomePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          SPORT FILTER + SEARCH — Chips premium com ícones coloridos
+          🆕 TÍTULO ANÁLISES DO DIA — Cinematográfico, sem filtros
           ═══════════════════════════════════════════════════════════════ */}
-      <section className="mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-arena-text-secondary/30" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar análise, time, campeonato..."
-              className="w-full h-10 pl-9 pr-4 rounded-xl bg-arena-dark/60 border border-arena-gray/25 text-xs text-white placeholder:text-arena-text-secondary/30 focus:outline-none focus:border-arena-green/40 focus:ring-1 focus:ring-arena-green/20 transition-all"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-arena-text-secondary/30 hover:text-white transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="mb-7 relative"
+      >
+        {/* Decorative background glow */}
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 rounded-full bg-arena-green/5 blur-3xl pointer-events-none" />
+        
+        <div className="relative z-10 text-center py-6">
+          {/* Top accent line */}
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ delay: 0.5, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="w-16 h-0.5 bg-gradient-to-r from-transparent via-arena-green to-transparent mx-auto mb-5"
+          />
+          
+          {/* Icon */}
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.4, type: 'spring', stiffness: 200, damping: 15 }}
+            className="w-12 h-12 rounded-2xl bg-gradient-to-br from-arena-green/20 to-arena-green/5 border border-arena-green/25 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-arena-green/10"
+          >
+            <BarChart3 className="w-6 h-6 text-arena-green" strokeWidth={1.5} />
+          </motion.div>
+          
+          {/* Title */}
+          <motion.h2
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-2"
+          >
+            ANÁLISES DO DIA
+          </motion.h2>
+          
+          {/* Subtitle */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="text-xs text-arena-text-secondary/40 font-medium tracking-wider uppercase"
+          >
+            Oportunidades Selecionadas pela Equipe
+          </motion.p>
+          
+          {/* Bottom accent line */}
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ delay: 0.7, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="w-24 h-0.5 bg-gradient-to-r from-transparent via-arena-green/50 to-transparent mx-auto mt-5"
+          />
         </div>
-
-        <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
-          <div className="flex gap-2 w-max">
-            {SPORTS.map((s, i) => {
-              const Icon = s.icon
-              const active = sport === s.id
-              return (
-                <motion.button
-                  key={s.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                  onClick={() => setSport(s.id)}
-                  className={`
-                    flex items-center gap-2 px-4 h-10 rounded-xl text-[12px] font-semibold
-                    border transition-all duration-300 whitespace-nowrap select-none
-                    ${active
-                      ? 'bg-arena-green text-black border-arena-green shadow-lg shadow-arena-green/20'
-                      : 'bg-arena-dark/60 text-arena-text-secondary/70 border-arena-gray/25 hover:border-arena-gray/50 hover:text-white'
-                    }
-                  `}
-                >
-                  <Icon
-                    className="w-4 h-4"
-                    strokeWidth={active ? 2.5 : 1.5}
-                    style={{ color: active ? '#000000' : s.color }}
-                  />
-                  {s.name}
-                </motion.button>
-              )
-            })}
-          </div>
-        </div>
-      </section>
+      </motion.section>
 
       {/* ═══════════════════════════════════════════════════════════════
-          ANÁLISES EM DESTAQUE — Scroll horizontal (substitui Jogos de Hoje)
+          ANÁLISES EM DESTAQUE — Scroll horizontal
           ═══════════════════════════════════════════════════════════════ */}
       <AnimatePresence mode="wait">
-        {featured.length > 0 && !searchQuery && (
+        {featured.length > 0 && (
           <motion.section
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -364,7 +369,7 @@ function HomePage() {
           ANÁLISES QUENTES — Carousel premium cinematográfico
           ═══════════════════════════════════════════════════════════════ */}
       <AnimatePresence mode="wait">
-        {hot.length > 0 && !searchQuery && (
+        {hot.length > 0 && (
           <motion.section
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -402,8 +407,8 @@ function HomePage() {
       <section className="mb-8">
         <SectionHeader
           icon={BarChart3}
-          title={searchQuery ? 'Resultados da Busca' : 'Todas as Análises'}
-          subtitle={searchQuery ? `${filteredItems?.length ?? 0} encontradas` : 'Oportunidades Disponíveis'}
+          title="Todas as Análises"
+          subtitle="Oportunidades Disponíveis"
           accentColor="#00C853"
         />
 
@@ -415,18 +420,18 @@ function HomePage() {
           </div>
         )}
 
-        {items && filteredItems && filteredItems.length === 0 && (
+        {items && items.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-14 text-arena-text-secondary/30"
           >
-            <Search className="w-10 h-10 mx-auto mb-3 opacity-20" strokeWidth={1.5} />
+            <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-20" strokeWidth={1.5} />
             <p className="text-sm font-medium">
-              {searchQuery ? 'Nenhuma análise encontrada para esta busca.' : 'Nenhuma análise disponível ainda.'}
+              Nenhuma análise disponível ainda.
             </p>
             <p className="text-xs mt-1 opacity-50">
-              {searchQuery ? 'Tente outro termo ou limpe a busca.' : 'Volte em breve para novas oportunidades.'}
+              Volte em breve para novas oportunidades.
             </p>
           </motion.div>
         )}
