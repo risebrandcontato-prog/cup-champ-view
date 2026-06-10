@@ -195,7 +195,7 @@ export function AnalysisForm({ initial }: AnalysisFormProps) {
   );
 
   // Legacy matches
-  const [matches, setMatches] = useState<<MatchInput[]>(
+  const [matches, setMatches] = useState<MatchInput[]>(
     initial?.matches?.map((m) => ({
       home_team: m.home_team,
       away_team: m.away_team,
