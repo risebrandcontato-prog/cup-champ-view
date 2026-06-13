@@ -77,7 +77,7 @@ function HomePage() {
 
   const hot = (items ?? []).filter((a) => a.is_hot).slice(0, 8)
   const featured = (items ?? []).filter((a) => a.is_featured && !a.is_hot).slice(0, 5)
-  const rest = (items ?? []).filter((a) => !a.is_hot && !a.is_featured)
+  const rest = (items ?? []).filter((a) => !a.is_hot && !a.is_featured).slice(0, 2)
 
   const firstName = profile?.name?.split(' ')[0] ?? 'Membro'
   const hour = new Date().getHours()
