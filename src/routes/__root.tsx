@@ -6,6 +6,7 @@ import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
 import { PWAStatusBar } from "@/components/pwa/PWAStatusBar";
+import { CopaDrawer } from "@/components/copa/CopaDrawer";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -37,7 +38,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", type: "image/png", sizes: "192x192", href: "/icons/icon-192x192.png" },
       { rel: "icon", type: "image/png", sizes: "512x512", href: "/icons/icon-512x512.png" },
       { rel: "apple-touch-icon", sizes: "152x152", href: "/icons/icon-152x152.png" },
-      { rel: "apple-touch-icon", sizes: "192x192", href: "/icons/icon-192x192.png" },
+      { rel: "apple-touch-icon", sizes: "192x152", href: "/icons/icon-192x192.png" },
       { rel: "apple-touch-startup-image", href: "/icons/splash-1170x2532.png", media: "(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
@@ -75,7 +76,6 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
-    // Register Service Worker
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
@@ -88,6 +88,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <PWAStatusBar />
       <Outlet />
+      <CopaDrawer />
       <Toaster theme="dark" position="top-center" richColors closeButton />
     </QueryClientProvider>
   );
