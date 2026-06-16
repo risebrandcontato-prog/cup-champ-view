@@ -126,3 +126,19 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
+
+/* Copa 2026 — botão flutuante pulsando dourado */
+@keyframes copa-pulse {
+  0%, 100% {
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.5),
+      0 0 0 1.5px oklch(0.86 0.16 90 / 35%),
+      0 0 10px oklch(0.86 0.16 90 / 20%);
+  }
+  50% {
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.5),
+      0 0 0 2px oklch(0.86 0.16 90 / 85%),
+      0 0 22px oklch(0.86 0.16 90 / 45%);
+  }
+}

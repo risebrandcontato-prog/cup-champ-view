@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { X, ChevronRight, Clock, Trophy, Users } from "lucide-react";
+import { X, ChevronRight, Clock, Trophy } from "lucide-react";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -136,7 +136,6 @@ function MatchCard({ match, highlight = false }: { match: Match; highlight?: boo
           : "bg-arena-gray/50 border border-white/5"
       }`}
     >
-      {/* Badge status + grupo */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-[10px] font-semibold text-arena-text-secondary uppercase tracking-wider">
           {match.group
@@ -156,9 +155,7 @@ function MatchCard({ match, highlight = false }: { match: Match; highlight?: boo
         </span>
       </div>
 
-      {/* Times + placar */}
       <div className="flex items-center gap-2">
-        {/* Time casa */}
         <div className="flex-1 flex items-center gap-2 min-w-0">
           <img
             src={match.homeTeam.crest}
@@ -171,7 +168,6 @@ function MatchCard({ match, highlight = false }: { match: Match; highlight?: boo
           </span>
         </div>
 
-        {/* Placar */}
         <div className="flex items-center gap-1 flex-shrink-0">
           {finished || live ? (
             <>
@@ -190,7 +186,6 @@ function MatchCard({ match, highlight = false }: { match: Match; highlight?: boo
           )}
         </div>
 
-        {/* Time fora */}
         <div className="flex-1 flex items-center gap-2 justify-end min-w-0">
           <span className="text-sm font-semibold text-white truncate text-right">
             {match.awayTeam.shortName}
@@ -204,7 +199,6 @@ function MatchCard({ match, highlight = false }: { match: Match; highlight?: boo
         </div>
       </div>
 
-      {/* Data/hora se agendado */}
       {!finished && !live && (
         <p className="text-[10px] text-arena-text-secondary text-center mt-1.5">
           {toBrasilia(match.utcDate)} (Brasília)
@@ -250,14 +244,12 @@ function TabLive({ isOpen }: { isOpen: boolean }) {
   if (isLoading) return <LoadingState />;
   if (error) return <EmptyState message="Não foi possível carregar os jogos." />;
   if (liveMatches.length === 0) {
-    return <EmptyState message={"Nenhum jogo ao vivo agora.\nVerifique a aba Hoje para os próximos jogos."} />;
+    return <EmptyState message={"Nenhum jogo ao vivo agora.\nVerifique a aba Jogos para os próximos."} />;
   }
 
   return (
     <div>
-      <p className="text-xs text-arena-text-secondary mb-3">
-        Atualiza automaticamente a cada 60s
-      </p>
+      <p className="text-xs text-arena-text-secondary mb-3">Atualiza automaticamente a cada 60s</p>
       {liveMatches.map((m) => (
         <MatchCard key={m.id} match={m} highlight />
       ))}
@@ -284,7 +276,6 @@ function TabToday() {
   const todayMatches: Match[] = data?.matches ?? [];
   const upcomingMatches: Match[] = upcomingData?.matches ?? [];
 
-  // Agrupar por data
   const groupByDate = (matches: Match[]) => {
     const groups: Record<string, Match[]> = {};
     matches.forEach((m) => {
@@ -295,9 +286,7 @@ function TabToday() {
     return groups;
   };
 
-  const todayGroups = groupByDate(todayMatches);
-  const upcomingGroups = groupByDate(upcomingMatches);
-  const allGroups = { ...todayGroups, ...upcomingGroups };
+  const allGroups = { ...groupByDate(todayMatches), ...groupByDate(upcomingMatches) };
 
   if (Object.keys(allGroups).length === 0) {
     return <EmptyState message="Nenhum jogo nos próximos dias." />;
@@ -309,9 +298,7 @@ function TabToday() {
         <div key={date} className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-3 h-3 text-arena-gold" />
-            <span className="text-xs font-semibold text-arena-gold uppercase tracking-wider">
-              {date}
-            </span>
+            <span className="text-xs font-semibold text-arena-gold uppercase tracking-wider">{date}</span>
           </div>
           {matches.map((m) => (
             <MatchCard key={m.id} match={m} highlight={isLive(m.status)} />
@@ -342,11 +329,9 @@ function TabStandings() {
   }
 
   const current = groups[selectedGroup];
-  const groupLetter = current?.group?.replace("GROUP_", "") ?? String.fromCharCode(65 + selectedGroup);
 
   return (
     <div>
-      {/* Seletor de grupos */}
       <div className="flex flex-wrap gap-1.5 mb-4">
         {groups.map((g, i) => {
           const letter = g.group?.replace("GROUP_", "") ?? String.fromCharCode(65 + i);
@@ -366,9 +351,7 @@ function TabStandings() {
         })}
       </div>
 
-      {/* Tabela */}
       <div className="rounded-xl overflow-hidden border border-white/5">
-        {/* Header */}
         <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-x-2 items-center px-3 py-2 bg-arena-gray/60 text-[10px] font-semibold text-arena-text-secondary uppercase tracking-wider">
           <span>#</span>
           <span>Seleção</span>
@@ -380,7 +363,7 @@ function TabStandings() {
         </div>
 
         {current?.table?.map((row, idx) => {
-          const qualified = idx < 2; // top 2 classificam direto
+          const qualified = idx < 2;
           return (
             <div
               key={row.team.name}
@@ -398,9 +381,7 @@ function TabStandings() {
                   className="w-4 h-4 object-contain flex-shrink-0"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
-                <span className="text-xs font-medium text-white truncate">
-                  {row.team.shortName}
-                </span>
+                <span className="text-xs font-medium text-white truncate">{row.team.shortName}</span>
               </div>
               <span className="text-xs text-arena-text-secondary text-center">{row.playedGames}</span>
               <span className="text-xs text-arena-text-secondary text-center">{row.won}</span>
@@ -408,10 +389,7 @@ function TabStandings() {
                 {row.goalDifference > 0 ? "+" : ""}{row.goalDifference}
               </span>
               <span className="text-xs font-bold text-white text-center">{row.points}</span>
-              {qualified && (
-                <ChevronRight className="w-3 h-3 text-arena-green" />
-              )}
-              {!qualified && <span />}
+              {qualified ? <ChevronRight className="w-3 h-3 text-arena-green" /> : <span />}
             </div>
           );
         })}
@@ -432,7 +410,6 @@ export function CopaDrawer() {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("today");
 
-  // Fechar com Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -441,13 +418,8 @@ export function CopaDrawer() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  // Bloquear scroll do body quando drawer aberto
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
@@ -459,24 +431,17 @@ export function CopaDrawer() {
 
   return (
     <>
-      {/* Botão flutuante */}
+      {/* Botão flutuante — centro vertical, borda dourada pulsando */}
       <button
         onClick={() => setOpen(true)}
         aria-label="Copa do Mundo 2026"
-        className="fixed bottom-6 right-4 z-40 w-14 h-14 rounded-full
-          bg-arena-dark border border-arena-gold/40
-          shadow-[0_4px_24px_rgba(0,0,0,0.5),0_0_16px_rgba(212,175,55,0.15)]
+        className="fixed top-1/2 -translate-y-1/2 right-4 z-40
+          w-14 h-14 rounded-full bg-arena-dark
           flex items-center justify-center
-          hover:scale-110 hover:border-arena-gold/70 hover:shadow-[0_4px_24px_rgba(0,0,0,0.5),0_0_20px_rgba(212,175,55,0.3)]
-          active:scale-95 transition-all duration-200
-          pb-safe"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0px)" }}
+          hover:scale-110 active:scale-95 transition-transform duration-200"
+        style={{ animation: "copa-pulse 2s ease-in-out infinite" }}
       >
-        <img
-          src="/fifa26.png"
-          alt="Copa 2026"
-          className="w-10 h-10 object-contain"
-        />
+        <img src="/fifa26.png" alt="Copa 2026" className="w-10 h-10 object-contain" />
       </button>
 
       {/* Overlay */}
@@ -492,12 +457,12 @@ export function CopaDrawer() {
         className={`fixed top-0 right-0 h-full z-50 w-full max-w-[420px]
           bg-arena-black border-l border-white/10
           shadow-[-8px_0_40px_rgba(0,0,0,0.6)]
-          flex flex-col
-          transition-transform duration-300 ease-in-out
+          flex flex-col transition-transform duration-300 ease-in-out
           ${open ? "translate-x-0" : "translate-x-full"}`}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 pt-safe pb-3 pt-4 border-b border-white/10 flex-shrink-0"
+        <div
+          className="flex items-center gap-3 px-4 pb-3 border-b border-white/10 flex-shrink-0"
           style={{ paddingTop: "max(env(safe-area-inset-top), 1rem)" }}
         >
           <img src="/fifa26.png" alt="Copa 2026" className="w-8 h-8 object-contain" />
